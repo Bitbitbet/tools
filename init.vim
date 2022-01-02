@@ -111,7 +111,7 @@ require'nvim-treesitter.configs'.setup {
 		enable = true
 	},
 	indent = {
-		enable = true
+		enable = false
 	}
 }
 EOF
@@ -244,10 +244,10 @@ noremap <silent> <LEADER>k <C-w>k
 noremap <silent> <LEADER>l <C-w>l
 
 syntax off
-filetype indent off
-set nocindent
-set nosmartindent
-set noautoindent
+" filetype indent off
+" set nocindent
+" set nosmartindent
+" set noautoindent
 
 
 exec "nohlsearch"
