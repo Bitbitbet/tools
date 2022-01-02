@@ -109,6 +109,9 @@ require'nvim-treesitter.configs'.setup {
 	ensure_installed = {"c", "cpp", "vim", "java", "python", "html", "json", "javascript", "bash", "lua"},
 	highlight = {
 		enable = true
+	},
+	indent = {
+		enable = true
 	}
 }
 EOF
@@ -204,6 +207,7 @@ let g:mkdp_echo_preview_url = 1
 colorscheme deus
 
 
+
 " --------------nvim settings--------------
 " Enable to move a line in normal mode
 noremap <C-k> ddkP
@@ -240,6 +244,12 @@ noremap <silent> <LEADER>k <C-w>k
 noremap <silent> <LEADER>l <C-w>l
 
 syntax off
+filetype indent off
+set nocindent
+set nosmartindent
+set noautoindent
+
+
 exec "nohlsearch"
 au BufRead,BufNewFile .zshrc set filetype=sh
 
