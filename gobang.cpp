@@ -29,8 +29,6 @@ constexpr uint_type AMOUNT_OF_ROWS = 5; // amount of chessmen required in a row 
 
 
 class CoreGame {
-private:
-	using rows_t = const UCoord (&)[2];
 public:
 	enum class Unit  : uint8_t {
 		EMPTY = 0, WHITE, BLACK
@@ -83,10 +81,12 @@ public:
 	 * Assertion failed will cause when status() == Status::NONE.
 	 * Return type: const Coord (&)[``AMOUNT_OF_CHESSMEN_REQUIRED_IN_A_ROW_TO_WIN``]
 	 */
-	rows_t get_rows() const {
+	std::pair<UCoord, UCoord> get_rows() const {
 		assert(status() != Status::NONE);
 		return rows;
 	}
+
+	bool is_white_turn() const {return m_is_white_turn;}
 private:
 
 	Unit &get(UCoord c) {
@@ -99,37 +99,40 @@ private:
 	}
 
 	Unit map[MAP_SIZE.w * MAP_SIZE.h];
-	UCoord rows[2]; /* Representing the start coord and the end coord
+	std::pair<UCoord, UCoord> rows; /* Representing the start coord and the end coord
 			  of a row that is long enough to win */
-	bool is_white_turn;
+	bool m_is_white_turn;
 	Status m_status;
 };
 
 void CoreGame::clear() {
 	memset(map, static_cast<int>(Unit::EMPTY), sizeof(map));
-	memset(rows, 0, sizeof(rows));
-	is_white_turn = true;
+	rows = {{0, 0}, {0, 0}};
+	m_is_white_turn = true;
 	m_status = Status::NONE;
 }
 
 void CoreGame::place(UCoord c) {
 	assert(get(c) == Unit::EMPTY);
 	
-	get(c) = is_white_turn ? Unit::WHITE : Unit::BLACK;
+	get(c) = m_is_white_turn ? Unit::WHITE : Unit::BLACK;
 
 	// Check whether there's rows
-	bool results[6] = {true, true, true, true, true, true}; // Check in six ways
+	bool results[8] = {true, true, true, true,
+		true, true, true, true}; // Check in eight ways
 	for(uint_type i = 1; i < AMOUNT_OF_ROWS; ++i) {
 		for(uint_type j = 0; j < 6; ++j) {
 			if(!results[j]) continue;
 			UCoord condidate_coord;
 			switch(j) {
-				case 0: condidate_coord = {c.x - i, c.y - i}; break;
-				case 1: condidate_coord = {c.x, c.y - i}; break;
-				case 2: condidate_coord = {c.x + i, c.y - i}; break;
-				case 3: condidate_coord = {c.x - i, c.y + i}; break;
-				case 4: condidate_coord = {c.x, c.y + i}; break;
-				case 5: condidate_coord = {c.x + i, c.y + i}; break;
+				case 0: condidate_coord = {c.x - i, c.y}; break;
+				case 1: condidate_coord = {c.x - i, c.y - i}; break;
+				case 2: condidate_coord = {c.x, c.y - i}; break;
+				case 3: condidate_coord = {c.x + i, c.y - i}; break;
+				case 4: condidate_coord = {c.x + i, c.y}; break;
+				case 5: condidate_coord = {c.x - i, c.y + i}; break;
+				case 6: condidate_coord = {c.x, c.y + i}; break;
+				case 7: condidate_coord = {c.x + i, c.y + i}; break;
 			}
 			if(condidate_coord.x >= MAP_SIZE.w ||
 					condidate_coord.y >= MAP_SIZE.h) {
@@ -143,21 +146,21 @@ void CoreGame::place(UCoord c) {
 	}
 	for(uint_type i = 0; i < 6; ++i) {
 		if(results[i]) {
-			m_status = is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
-			rows[0] = c;
+			m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
+			rows.first = c;
 			switch(i) {
-				case 0: rows[1] = {c.x - AMOUNT_OF_ROWS + 1, c.y - AMOUNT_OF_ROWS + 1}; break;
-				case 1: rows[1] = {c.x, c.y - AMOUNT_OF_ROWS + 1}; break;
-				case 2: rows[1] = {c.x + AMOUNT_OF_ROWS - 1, c.y - AMOUNT_OF_ROWS + 1}; break;
-				case 3: rows[1] = {c.x - AMOUNT_OF_ROWS + 1, c.y + AMOUNT_OF_ROWS - 1}; break;
-				case 4: rows[1] = {c.x, c.y + AMOUNT_OF_ROWS - 1}; break;
-				case 5: rows[1] = {c.x + AMOUNT_OF_ROWS - 1, c.y + AMOUNT_OF_ROWS - 1}; break;
+				case 0: rows.second = {c.x - AMOUNT_OF_ROWS + 1, c.y - AMOUNT_OF_ROWS + 1}; break;
+				case 1: rows.second = {c.x, c.y - AMOUNT_OF_ROWS + 1}; break;
+				case 2: rows.second = {c.x + AMOUNT_OF_ROWS - 1, c.y - AMOUNT_OF_ROWS + 1}; break;
+				case 3: rows.second = {c.x - AMOUNT_OF_ROWS + 1, c.y + AMOUNT_OF_ROWS - 1}; break;
+				case 4: rows.second = {c.x, c.y + AMOUNT_OF_ROWS - 1}; break;
+				case 5: rows.second = {c.x + AMOUNT_OF_ROWS - 1, c.y + AMOUNT_OF_ROWS - 1}; break;
 			}
 			return;
 		}
 	}
 
-	is_white_turn = !is_white_turn;
+	m_is_white_turn = !m_is_white_turn;
 }
 
 
@@ -245,7 +248,9 @@ namespace frontend_with_console {
 	constexpr ColorEnum BLACK_COLOR = ColorEnum::BLACK;
 	constexpr ColorEnum SELECTION_COLOR = ColorEnum::CYAN;
 
-	enum class Key : uint8_t {UP, DOWN, LEFT, RIGHT, ENTER, QUIT};
+	enum class Key : uint8_t {
+		UP, DOWN, LEFT, RIGHT, ENTER, RESET/* reset the cursor position */, QUIT
+	};
 	constexpr inline Key key_from_console_key(console::Key k) {
 		switch(k) {
 			case console::Key::UP: return Key::UP;
@@ -325,7 +330,6 @@ namespace frontend_with_console {
 
 	/*
 	 * Print selection.
-	 * Ensure the position of cursor is topleft before calling.
 	 * The position of cursor should be {0, MAP_SIZE.h + 2} after a call completes.
 	 */
 	void print_selection(const CoreGame &game, UCoord selection_pos, bool has_old_selection_pos = false, UCoord old_selection_pos = {0, 0}) {
@@ -378,6 +382,7 @@ namespace frontend_with_console {
 	void Game::start() {
 		screen_clear();
 		print(game);
+		printf("%s's turn.\n", game.is_white_turn() ? "white" : "black");
 		print_selection(game, selection_pos);
 
 		ArrowKeyPraser praser;
@@ -400,6 +405,7 @@ namespace frontend_with_console {
 					case 'S': case 'J': key = Key::DOWN; break;
 					case 'W': case 'K': key = Key::UP; break;
 					case 'D': case 'L': key = Key::RIGHT; break;
+					case 'R': key = Key::RESET; break;
 					case 'Q': key = Key::QUIT; break;
 					case '\n': case ' ': key = Key::ENTER; break;
 					default: continue;
@@ -410,7 +416,24 @@ namespace frontend_with_console {
 			if(key == Key::QUIT) {
 				return;
 			} else if(key == Key::ENTER) {
-				game.place(selection_pos);
+				if(game[selection_pos] == CoreGame::Unit::EMPTY) {
+					game.place(selection_pos);
+				}
+			} else if(key == Key::RESET) {
+				bool reset_success = false;
+				for(uint_type y = 0; y < MAP_SIZE.h; ++y) {
+					for(uint_type x = 0; x < MAP_SIZE.w; ++x) {
+						if(game[{x, y}] == CoreGame::Unit::EMPTY) {
+							selection_pos = {x, y};
+							reset_success = true;
+							break;
+						}
+					}
+					if(reset_success) break;
+				}
+				if(!reset_success) {
+					return;
+				}
 			} else {
 				UCoord new_selection_pos = selection_pos;
 				auto inboard = [](UCoord c) -> bool {
@@ -472,11 +495,13 @@ namespace frontend_with_console {
 			buf_selection_pos = selection_pos;
 
 			// Check game status
-			if(game.status() != CoreGame::Status::NONE) {
+			if(game.status() == CoreGame::Status::NONE) {
+				printf("%s's turn.\n", game.is_white_turn() ? "white" : "black");
+			} else {
 				if(game.status() == CoreGame::Status::BLACK_WON) {
-					printf("Black won.\n");
+					printf("\nBlack won.\n");
 				} else if(game.status() == CoreGame::Status::WHITE_WON) {
-					printf("White won.\n");
+					printf("\nWhite won.\n");
 				}
 				return;
 			}
@@ -502,7 +527,7 @@ int process_argument(size_t argc, char **argv) {
 	help.set_argc(0);
 	help.set_description("Display this help and exit.");
 	help.set_act_func([&ap](char **argv) {
-		ap.output_help({argv[0], ": Gobang, can either run with SDL2 or in terminal.\nRun in terminal in default."});
+		ap.output_help({argv[0], ": Gobang, can either run with SDL2 or in terminal.\nRun in terminal in default.\nConsole mode: WASDQR<Enter><Space>"});
 		exit(0);
 	});
 
