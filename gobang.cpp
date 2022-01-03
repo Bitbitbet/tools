@@ -258,6 +258,7 @@ namespace frontend_with_console {
 			case console::Key::LEFT: return Key::LEFT;
 			case console::Key::RIGHT: return Key::RIGHT;
 		}
+		return Key::UP; //avoid warning
 	}
 
 	/*
