@@ -1,11 +1,14 @@
 #include "argument_utils.h"
 #include <SDL2/SDL.h>
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <string_view>
 #include <iostream>
 
 #include <console.h>
+#include <sys/types.h>
 #define INCLUDE_ARGUMENT
 #include <utils.h>
 
@@ -17,16 +20,13 @@ using console::Area;
 using console::ArrowKeyPraser;
 using console::ColorEnum;
 using console::color_reset;
-using console::cursor_pos_save;
-using console::cursor_pos_reload;
 using console::cursor_gotoxy;
 using console::screen_clear;
-using console::cursor_set_visible;
 
+using std::string_view;
 
 constexpr struct Area MAP_SIZE = {15, 15};
 constexpr uint_type AMOUNT_OF_ROWS = 5; // amount of chessmen required in a row to win
-
 
 class CoreGame {
 public:
@@ -99,8 +99,8 @@ private:
 	}
 
 	Unit map[MAP_SIZE.w * MAP_SIZE.h];
-	std::pair<UCoord, UCoord> rows; /* Representing the start coord and the end coord
-			  of a row that is long enough to win */
+	std::pair<UCoord, UCoord> rows; /* Contains the start coord and the end coord
+			  of a row that is long enough to win. */
 	bool m_is_white_turn;
 	Status m_status;
 };
@@ -114,14 +114,14 @@ void CoreGame::clear() {
 
 void CoreGame::place(UCoord c) {
 	assert(get(c) == Unit::EMPTY);
-	
+
 	get(c) = m_is_white_turn ? Unit::WHITE : Unit::BLACK;
 
 	// Check whether there's rows
 	bool results[8] = {true, true, true, true,
 		true, true, true, true}; // Check in eight ways
 	for(uint_type i = 1; i < AMOUNT_OF_ROWS; ++i) {
-		for(uint_type j = 0; j < 6; ++j) {
+		for(uint_type j = 0; j < 8; ++j) {
 			if(!results[j]) continue;
 			UCoord condidate_coord;
 			switch(j) {
@@ -144,7 +144,7 @@ void CoreGame::place(UCoord c) {
 			}
 		}
 	}
-	for(uint_type i = 0; i < 6; ++i) {
+	for(uint_type i = 0; i < 8; ++i) {
 		if(results[i]) {
 			m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
 			rows.first = c;
@@ -166,22 +166,274 @@ void CoreGame::place(UCoord c) {
 
 namespace frontend_with_SDL2 {
 	namespace background {
-		constexpr struct {uint8_t r, g, b;} BACKGROUND_COLOR = {255, 228, 181};
+		constexpr struct SDL_Color BACKGROUND_COLOR = {255, 228, 181};
 		constexpr uint_type LINE_WIDTH = 3;
 		constexpr Area BLANK_BETWEEN_LINES_SIZE = {30, 30};
 		constexpr uint_type BROAD_WIDTH = 6;
-		constexpr Area BLANK_OUTOF_MAP_SIZE = {40, 40};
+		constexpr Area BLANK_OUTOF_MAP_SIZE = {20, 80};
 
-		constexpr Area SIZE = {
-			LINE_WIDTH * MAP_SIZE.w + BLANK_BETWEEN_LINES_SIZE.w *
-				(MAP_SIZE.w + 1) +
-				BROAD_WIDTH * 2 + BLANK_OUTOF_MAP_SIZE.w * 2,
-			LINE_WIDTH * MAP_SIZE.h + BLANK_BETWEEN_LINES_SIZE.h *
-				(MAP_SIZE.h + 1) +
-				BROAD_WIDTH * 2 + BLANK_OUTOF_MAP_SIZE.h * 2};
+	}
+	constexpr Area WINDOW_SIZE = {
+		background::LINE_WIDTH * MAP_SIZE.w + background::BLANK_BETWEEN_LINES_SIZE.w *
+			(MAP_SIZE.w + 1) +
+			background::BROAD_WIDTH * 2 + background::BLANK_OUTOF_MAP_SIZE.w * 2,
+		background::LINE_WIDTH * MAP_SIZE.h + background::BLANK_BETWEEN_LINES_SIZE.h *
+			(MAP_SIZE.h + 1) +
+			background::BROAD_WIDTH * 2 + background::BLANK_OUTOF_MAP_SIZE.h * 2};
+	/*
+	 * Generate the background surface.
+	 * Return the surface handle, which requires to be freed by SDL_FreeSurface manually.
+	 */
+	SDL_Surface *generate_background_surface(SDL_PixelFormat *format) {
+		using namespace background;
+		const auto background_color = SDL_MapRGB(format, BACKGROUND_COLOR.r,
+				BACKGROUND_COLOR.g, BACKGROUND_COLOR.b);
+		const auto black_color = SDL_MapRGB(format, 50, 50, 50);
+
+		constexpr Area INNER_MAP_SIZE = {LINE_WIDTH * 15 + BLANK_BETWEEN_LINES_SIZE.w * 16,
+				LINE_WIDTH * 15 + BLANK_BETWEEN_LINES_SIZE.h * 16};
+		constexpr Area REAL_MAP_SIZE = {INNER_MAP_SIZE.w + BROAD_WIDTH * 2,
+				INNER_MAP_SIZE.h + BROAD_WIDTH * 2};
+
+		SDL_Surface *background_surface = SDL_CreateRGBSurfaceWithFormat(0, WINDOW_SIZE.w, WINDOW_SIZE.h, 0, format->format);
+		SDL_Rect r = {0, 0, WINDOW_SIZE.w, WINDOW_SIZE.h};
+		SDL_FillRect(background_surface, &r, background_color);
+	
+		r = {BLANK_OUTOF_MAP_SIZE.w, BLANK_OUTOF_MAP_SIZE.h,
+			REAL_MAP_SIZE.w, REAL_MAP_SIZE.h};
+		SDL_FillRect(background_surface, &r, black_color);
+		for(size_t x = 0; x < MAP_SIZE.w + 1; ++x) {
+			for(size_t y = 0; y < MAP_SIZE.h + 1; ++y) {
+				r = {
+					static_cast<int>(BLANK_OUTOF_MAP_SIZE.w + BROAD_WIDTH + x *
+					(BLANK_BETWEEN_LINES_SIZE.w + LINE_WIDTH)),
+					static_cast<int>(BLANK_OUTOF_MAP_SIZE.h + BROAD_WIDTH + y *
+					(BLANK_BETWEEN_LINES_SIZE.h + LINE_WIDTH)),
+					BLANK_BETWEEN_LINES_SIZE.w, BLANK_BETWEEN_LINES_SIZE.h
+				};
+				SDL_FillRect(background_surface, &r, background_color);
+			}
+		}
+		return background_surface;
 	}
 
-	class Game {
+	class Font {
+	private:
+		/*
+		 * Raw font data, with characters in order 0~9A~Z
+		 * Each pixel occupies 1 bit; Each character occupies
+		 * FONT_CHARACTER_SIZE.w * FONT_CHARACTER_SIZE.h * 1 bits.
+		 */
+		constexpr static char RAW_FONT_DATA[] =
+			"APMADPADAPAMDMPADPMAPPADPMAPPADPMAPDMDAPAMAPMADPAADMAAPAAPMADPAADMAAPAADMA"
+			"APAADMAAPAADMAAPADPPMPPPDPPAPPMPADPMAPAAPMADPAPPADPMDPMAPPAPMADPAAPPPPPPPD"
+			"PPMPPPAAPAADMADMAAPAAPPADPMAADMAAPDADMMAPDPPAPPMADPAAPMAPPADPMDMPAPDMPAPDM"
+			"DMPPPPPPPAAPAADMAAPAADMPPPDPPMPAADMAAPPPDPPMAADMAAPAADMAAPPADPMAPDPPAPPMAP"
+			"MADPADMAAPAAPAADMAAPPPDPPMPADPMAPPADPMAPDPPAPPMPPPPPPPPADPMAPAAPAADMADMAAP"
+			"AAPAADMAAPAADMAAPAADMADPMAPPAPADDMAMPMDDPAMDPMAPPAMDPPAPPMADPAAPDPPAPPMDPP"
+			"APPMPADPMAPPADPMAPDPPMPPPAADMAAPAAPAADMDPMAPPAAPMADPADMPAPDMPADPMAPPADPMAP"
+			"PPPPPPPPADPMAPPADPMAPPPPDPPMPADPMAPPADPMAPPPPDPPMPADPMAPPADPMAPPPPDPPMAPPA"
+			"DPMDMDMPAPPAADMAAPAADMAAPAADMAADMDMPAPAPPADPMPPMDPPAPAPDMDMPADPMAPPADPMAPP"
+			"ADPMAPPAPDMDMPPMDPPADPPMPPPDMAAPAADMAAPAADPPAPPMDMAAPAADMAAPAADPPMPPPPPPPP"
+			"PPPAADMAAPAADMAAPPPDPPMPAADMAAPAADMAAPAADMAAAPPMDPPDMAAPAAPAADMAAPAPPMDPPA"
+			"DPMAPDMDMPAPAPPMDPPPADPMAPPADPMAPPADPMAPPPPPPPPPADPMAPPADPMAPPADPMAPDPPMPP"
+			"PADMAAPAADMAAPAADMAAPAADMAAPAADMAAPADPPMPPPDPPMPPPADMAAPAADMAAPAADMAAPAADM"
+			"AAPADDMAMPADPAAPMAPADPMAPPAPDMDMPDMDMPAPPADPMAPPMDPPAPDPDMPMPAPPMDPDMAAPAA"
+			"DMAAPAADMAAPAADMAAPAADMAAPAADMAAPAADPPMPPPPADPMAPPMPPPDPPPPPPPPPPPPPPPPDDP"
+			"MMPPADPMAPPADPMAPPADPMAPPMDPPAPPPDPPMPPPPPPPPPDPPMPPPAPPMDPPADPMAPDPPAPPMP"
+			"ADPMAPPADPMAPPADPMAPPADPMAPPADPMAPDPPAPPMPPPDPPMPADPMAPPADPMAPPADPMAPPPPDP"
+			"PMPAADMAAPAADMAADPMAPPAPADPMAPPADPMAPPADPMAPPADPMAPDPPAPPMAADMAAPPPPDPPMPA"
+			"DPMAPPADPMAPPAPPMDPPPMDPPAPDPDMPMPAPPMDPDPMAPPAPAPDMDMPAADMAADPPAPPMAADMAA"
+			"PPADPMAPDPPAPPMDPPMPPPADMAAPAADMAAPAADMAAPAADMAAPAADMAAPAADMAAPAPADPMAPPAD"
+			"PMAPPADPMAPPADPMAPPADPMAPPADPMAPDPPAPPMPADPMAPPADPMAPPADPMAPPMPPPDPDPPAPPM"
+			"APMADPAADAAAMAPADPMAPPADPMAPPDDPMMPPPPPPPPPPPPPPPPMPPPDPPADPMAPPADPMAPDMPA"
+			"PDMAPMADPAAPMADPADMPAPDMPADPMAPMAAPAADDMDMPAPDMDMPAPDMDMPAPAPPADPMADMAAPAA"
+			"DMAAPAADMAAPADPPMPPPAADMAAPAAPAADMADMAAPAAPAADMADMAAPAADPPMPPP";
+
+		constexpr static Area FONT_CHARACTER_SIZE = {14, 14};
+		constexpr static size_t SCALE_TIME = 2;
+		constexpr static Area DEFAULT_EXTRA_ADVANCE = {SCALE_TIME, SCALE_TIME};
+
+	public:
+		constexpr static size_t CHARACTER_COUNT = 36;
+		constexpr static Area CHARACTER_SIZE = {FONT_CHARACTER_SIZE.w * SCALE_TIME, FONT_CHARACTER_SIZE.h * SCALE_TIME};
+
+		Font(SDL_PixelFormat *format, SDL_Renderer *render, SDL_Color color);
+		~Font();
+		Font(const Font &) = delete;
+		Font &operator=(const Font &&) = delete;
+
+		/*
+		 * Render a string with specific string, position and advance.
+		 * The Ucoord pos describes the topleft of the text.
+		 * Skip the character unsupported(be seen as ' ').
+		 *
+		 * Return the region rendered on.
+		 */
+		SDL_Rect render_text(const string_view string,
+				UCoord topleft_position,
+				Area extra_advance = DEFAULT_EXTRA_ADVANCE) const;
+
+		/*
+		 * Same as render_text.
+		 * The SDL_Surface* that is returned needs freed manually.
+		 */
+		SDL_Surface *create_surface_from_text(
+				SDL_PixelFormat *format,
+				const string_view string,
+				Area extra_advance = DEFAULT_EXTRA_ADVANCE) const;
+
+	private:
+
+		/*
+		 * See RAW_FONT_DATA as a bitset, and access it with a index.
+		 */
+		constexpr static uint8_t get(uint_type index) {
+			constexpr uint8_t condidate[] = {
+				0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1,
+				0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1,
+				0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1,
+				0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1
+			};
+			return condidate[(index % 4) * 16 + (RAW_FONT_DATA[index / 4] - 'A')];
+		}
+
+		SDL_Color fore, back;
+
+		SDL_Surface *font_surface;
+		SDL_Texture *font_texture;
+
+		SDL_Renderer *render;
+	};
+	Font::Font(SDL_PixelFormat *format, SDL_Renderer *render, SDL_Color color) :
+		fore(color), back(color.r == 0 && color.g == 0 && color.b == 0 ? SDL_Color{255, 255, 255} : SDL_Color{0, 0, 0}) {
+
+		font_surface = SDL_CreateRGBSurfaceWithFormat(0,
+				FONT_CHARACTER_SIZE.w * CHARACTER_COUNT * SCALE_TIME,
+				FONT_CHARACTER_SIZE.h * SCALE_TIME,
+				0, format->format);
+
+		const Uint32 fore_color = SDL_MapRGB(format, color.r, color.g, color.b);
+		const Uint32 back_color = SDL_MapRGB(format, back.r, back.g, back.b);
+		memset(font_surface->pixels, back_color, font_surface->pitch * font_surface->h);
+
+		for(uint_type index = 0; index < CHARACTER_COUNT; ++index) {
+			SDL_Rect r{0, 0, SCALE_TIME, SCALE_TIME};
+			for(uint_type y = 0; y < FONT_CHARACTER_SIZE.h; ++y) {
+				r.y = y * SCALE_TIME;
+				for(uint_type x = 0; x < FONT_CHARACTER_SIZE.w; ++x) {
+					if(get(index * FONT_CHARACTER_SIZE.w * FONT_CHARACTER_SIZE.h + y * FONT_CHARACTER_SIZE.w + x) == 1) {
+						r.x = (x + FONT_CHARACTER_SIZE.w * index) * SCALE_TIME;
+						SDL_FillRect(font_surface, &r, fore_color);
+					}
+				}
+			}
+		}
+
+		SDL_SetColorKey(font_surface, SDL_TRUE, back_color);
+		/// SDL_LockSurface(font_surface);
+		/// SDL_SetSurfaceRLE(font_surface, SDL_TRUE);
+
+		font_texture = SDL_CreateTextureFromSurface(render, font_surface);
+		this->render = render;
+	}
+	Font::~Font() {
+		SDL_FreeSurface(font_surface);
+		SDL_DestroyTexture(font_texture);
+	}
+	SDL_Rect Font::render_text(const string_view str, UCoord pos, Area extra_advance) const {
+		SDL_Rect srcrect{0, 0, CHARACTER_SIZE.w, CHARACTER_SIZE.h}, dstrect{0, 0, CHARACTER_SIZE.w, CHARACTER_SIZE.h};
+		dstrect.x = pos.x;
+		dstrect.y = pos.y;
+		SDL_Rect region{ static_cast<int>(pos.x), static_cast<int>(pos.y), 0, 1};
+		size_t region_width_temp = 0;
+		for(char c : str) {
+			c = toupper(c);
+			bool right_advance = false, down_advance = false;
+			if((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z')) {
+				if(c >= '0' && c <= '9') {
+					srcrect.x = CHARACTER_SIZE.w * (c - '0');
+				} else {
+					srcrect.x = CHARACTER_SIZE.w * (c - 'A' + 10);
+				}
+
+				SDL_RenderCopy(render, font_texture, &srcrect, &dstrect);
+				right_advance = true;
+			} else if(c == '\n') {
+				down_advance = true;
+			} else {
+				right_advance = true;
+			}
+			if(right_advance) {
+				dstrect.x += CHARACTER_SIZE.w + extra_advance.w;
+				++region_width_temp;
+				if(region_width_temp > region.w) {
+					region.w = region_width_temp;
+				}
+			}
+			if(down_advance) {
+				dstrect.x = pos.x;
+				dstrect.y += CHARACTER_SIZE.h + extra_advance.h;
+				++region.h;
+				region_width_temp = 0;
+			}
+		}
+		if(region.w != 0) region.w = region.w * (CHARACTER_SIZE.w + extra_advance.w) - extra_advance.w;
+		region.h = region.h * (CHARACTER_SIZE.h + extra_advance.h) - extra_advance.h;
+		return region;
+	}
+	SDL_Surface *Font::create_surface_from_text(SDL_PixelFormat *format, const string_view str, Area extra_advance) const {
+		Area surface_size = {0, 1};
+		{
+			uint_type width = 0;
+			for(char c : str) {
+				if(c == '\n') {
+					width = 0;
+					++surface_size.h;
+				} else {
+					++width;
+					if(width > surface_size.w) {
+						surface_size.w = width;
+					}
+				}
+			}
+			if(surface_size.w != 0) surface_size.w = surface_size.w * (CHARACTER_SIZE.w + extra_advance.w) - extra_advance.w;
+			surface_size.h = surface_size.h * (CHARACTER_SIZE.h + extra_advance.h) - extra_advance.h;
+		}
+		SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, surface_size.w, surface_size.h, 0, format->format);
+		SDL_Rect srcrect{0, 0, CHARACTER_SIZE.w, CHARACTER_SIZE.h}, dstrect{0, 0, CHARACTER_SIZE.w, CHARACTER_SIZE.h};
+		for(char c : str) {
+			c = toupper(c);
+			bool right_advance = false, down_advance = false;
+			if((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z')) {
+				if(c >= '0' && c <= '9') {
+					srcrect.x = CHARACTER_SIZE.w * (c - '0');
+				} else {
+					srcrect.x = CHARACTER_SIZE.w * (c - 'A' + 10);
+				}
+
+				SDL_BlitSurface(font_surface, &srcrect, surface, &dstrect);
+				right_advance = true;
+			} else if(c == '\n') {
+				down_advance = true;
+			} else {
+				right_advance = true;
+			}
+			if(right_advance) dstrect.x += CHARACTER_SIZE.w + extra_advance.w;
+			if(down_advance) {
+				dstrect.x = 0;
+				dstrect.y += CHARACTER_SIZE.h + extra_advance.h;
+			}
+		}
+		SDL_SetColorKey(surface, SDL_TRUE, SDL_MapRGB(format, back.r, back.g, back.b));
+		return surface;
+	}
+	
+
+	/*
+	 * Frontend with SDL2.
+	 */
+        class Game {
 	public:
 		static Game &instance() { //Make sure that there is only one instance of Game.
 			static Game g;
@@ -197,6 +449,9 @@ namespace frontend_with_SDL2 {
 		SDL_Window *window;
 		SDL_Renderer *render;
 		SDL_Texture *background_texture;
+		Font *font;
+
+		CoreGame game;
 
 		Game();
 	};
@@ -209,16 +464,22 @@ namespace frontend_with_SDL2 {
 		}
 		window = SDL_CreateWindow("Gobang", SDL_WINDOWPOS_UNDEFINED,
 					SDL_WINDOWPOS_UNDEFINED,
-					background::SIZE.w,
-					background::SIZE.h,
+					WINDOW_SIZE.w,
+					WINDOW_SIZE.h,
 					SDL_WINDOW_SHOWN);
 		render = SDL_CreateRenderer(window, -1,
 				SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+		SDL_Surface *screen = SDL_GetWindowSurface(window);
 
-		
+		SDL_Surface *background_surface = generate_background_surface(screen->format);
+		background_texture = SDL_CreateTextureFromSurface(render, background_surface);
+		SDL_FreeSurface(background_surface);
+
+		font = new Font(screen->format, render, {0x20, 0x20, 0x20});
 	}
 
 	Game::~Game() {
+		delete font;
 		SDL_DestroyRenderer(render);
 		SDL_DestroyWindow(window);
 		SDL_Quit();
@@ -233,6 +494,16 @@ namespace frontend_with_SDL2 {
 						return;
 				}
 			}
+
+			SDL_SetRenderDrawColor(render, background::BACKGROUND_COLOR.r, background::BACKGROUND_COLOR.g, background::BACKGROUND_COLOR.b, 255);
+			SDL_RenderClear(render);
+			SDL_RenderCopy(render, background_texture, nullptr, nullptr);
+			SDL_Rect r = font->render_text("TODO MEANS THERES NOTHING TO DO", {0, 0});
+			SDL_SetRenderDrawColor(render, 0, 0, 0, 255);
+			SDL_RenderDrawRect(render, &r);
+
+
+			SDL_RenderPresent(render);
 		}
 	}
 }
@@ -249,7 +520,7 @@ namespace frontend_with_console {
 	constexpr ColorEnum SELECTION_COLOR = ColorEnum::CYAN;
 
 	enum class Key : uint8_t {
-		UP, DOWN, LEFT, RIGHT, ENTER, RESET/* reset the cursor position */, QUIT
+		UP, DOWN, LEFT, RIGHT, ENTER, RESET/* reset the selection position */, QUIT
 	};
 	constexpr inline Key key_from_console_key(console::Key k) {
 		switch(k) {
@@ -264,7 +535,7 @@ namespace frontend_with_console {
 	/*
 	 * Print the content of a CoreGame.
 	 * Ensure the position of cursor is topleft before calling.
-	 * The position of cursor should be {0, MAP_SIZE.h + 2} after the function finishes.
+	 * The position of cursor is set to {0, MAP_SIZE.h + 2} after the function finishes.
 	 */
 	void print(const CoreGame &g) {
 		putchar('|');
@@ -301,7 +572,7 @@ namespace frontend_with_console {
 	/*
 	 * Print the difference between the output of ``print(game)`` and ``print(bufgame)``.
 	 * Ensure the position of cursor is topleft before calling.
-	 * The position of cursor should be {0, MAP_SIZE.h + 2} after a call completes.
+	 * The position of cursor is set to {0, MAP_SIZE.h + 2} after a call completes.
 	 */
 	void print_diff(const CoreGame &game, const CoreGame &bufgame) {
 		for(uint_type x = 0; x < MAP_SIZE.w; ++x) {
@@ -331,7 +602,7 @@ namespace frontend_with_console {
 
 	/*
 	 * Print selection.
-	 * The position of cursor should be {0, MAP_SIZE.h + 2} after a call completes.
+	 * The position of cursor is set to {0, MAP_SIZE.h + 2} after a call completes.
 	 */
 	void print_selection(const CoreGame &game, UCoord selection_pos, bool has_old_selection_pos = false, UCoord old_selection_pos = {0, 0}) {
 		assert(selection_pos.x < MAP_SIZE.w || selection_pos.y < MAP_SIZE.h);
@@ -383,7 +654,7 @@ namespace frontend_with_console {
 	void Game::start() {
 		screen_clear();
 		print(game);
-		printf("%s's turn.\n", game.is_white_turn() ? "white" : "black");
+		printf("%s's turn.\n", game.is_white_turn() ? "White" : "Black");
 		print_selection(game, selection_pos);
 
 		ArrowKeyPraser praser;
@@ -422,19 +693,25 @@ namespace frontend_with_console {
 				}
 			} else if(key == Key::RESET) {
 				bool reset_success = false;
-				for(uint_type y = 0; y < MAP_SIZE.h; ++y) {
-					for(uint_type x = 0; x < MAP_SIZE.w; ++x) {
-						if(game[{x, y}] == CoreGame::Unit::EMPTY) {
-							selection_pos = {x, y};
-							reset_success = true;
-							break;
+				UCoord iter = {selection_pos.x + 1, selection_pos.y};
+				while(iter != selection_pos) {
+					if(iter.x == MAP_SIZE.w) {
+						iter.x = 0;
+						++iter.y;
+						if(iter.y == MAP_SIZE.h) {
+							iter.y = 0;
 						}
 					}
-					if(reset_success) break;
+
+					if(game[iter] == CoreGame::Unit::EMPTY) {
+						selection_pos = iter;
+						reset_success = true;
+						break;
+					}
+
+					++iter.x;
 				}
-				if(!reset_success) {
-					return;
-				}
+				if(!reset_success) return;
 			} else {
 				UCoord new_selection_pos = selection_pos;
 				auto inboard = [](UCoord c) -> bool {
@@ -497,7 +774,7 @@ namespace frontend_with_console {
 
 			// Check game status
 			if(game.status() == CoreGame::Status::NONE) {
-				printf("%s's turn.\n", game.is_white_turn() ? "white" : "black");
+				printf("%s's turn.\n", game.is_white_turn() ? "White" : "Black");
 			} else {
 				if(game.status() == CoreGame::Status::BLACK_WON) {
 					printf("\nBlack won.\n");
