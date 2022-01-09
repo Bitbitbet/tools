@@ -1,5 +1,7 @@
 #include "argument_utils.h"
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_error.h>
+#include <SDL2/SDL_render.h>
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -170,7 +172,7 @@ namespace frontend_with_SDL2 {
 		constexpr uint_type LINE_WIDTH = 3;
 		constexpr Area BLANK_BETWEEN_LINES_SIZE = {30, 30};
 		constexpr uint_type BROAD_WIDTH = 6;
-		constexpr Area BLANK_OUTOF_MAP_SIZE = {20, 80};
+		constexpr Area BLANK_OUTOF_MAP_SIZE = {20, 60};
 
 	}
 	constexpr Area WINDOW_SIZE = {
@@ -459,7 +461,7 @@ namespace frontend_with_SDL2 {
 	Game::Game() {
 		// Initialize SDL2
 		if(SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO) < 0) {
-			std::cerr << SDL_GetError() << std::ends;
+			log_error("Error initializing SDL2: %s.", SDL_GetError());
 			exit(1);
 		}
 		window = SDL_CreateWindow("Gobang", SDL_WINDOWPOS_UNDEFINED,
@@ -467,8 +469,20 @@ namespace frontend_with_SDL2 {
 					WINDOW_SIZE.w,
 					WINDOW_SIZE.h,
 					SDL_WINDOW_SHOWN);
+		if(!window) {
+			log_error("Error occurred creating the main window: %s.", SDL_GetError());
+			exit(1);
+		}
 		render = SDL_CreateRenderer(window, -1,
 				SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+		if(!render) {
+			log_error("Warning: cannot create renderer with hardware acceleration: %s.", SDL_GetError());
+			render = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
+			if(!render) {
+				log_error("Can't create renderer.");
+				exit(1);
+			}
+		}
 		SDL_Surface *screen = SDL_GetWindowSurface(window);
 
 		SDL_Surface *background_surface = generate_background_surface(screen->format);
@@ -498,7 +512,7 @@ namespace frontend_with_SDL2 {
 			SDL_SetRenderDrawColor(render, background::BACKGROUND_COLOR.r, background::BACKGROUND_COLOR.g, background::BACKGROUND_COLOR.b, 255);
 			SDL_RenderClear(render);
 			SDL_RenderCopy(render, background_texture, nullptr, nullptr);
-			SDL_Rect r = font->render_text("TODO MEANS THERES NOTHING TO DO", {0, 0});
+			SDL_Rect r = font->render_text("TODO MEANS\n THERES NOTHING\n TO DO", {0, 0});
 			SDL_SetRenderDrawColor(render, 0, 0, 0, 255);
 			SDL_RenderDrawRect(render, &r);
 
