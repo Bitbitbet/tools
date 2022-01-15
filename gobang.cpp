@@ -1,4 +1,7 @@
+#include "SDL2/SDL_blendmode.h"
+#include "SDL2/SDL_pixels.h"
 #include "SDL2/SDL_render.h"
+#include "SDL2/SDL_surface.h"
 #include "argument_utils.h"
 #include <SDL2/SDL.h>
 #include <algorithm>
@@ -202,19 +205,20 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH) - BACKGROUND_LINE_WIDTH / 2};
 	}
 	
+
+	constexpr Area CHESSMAN_AREA = { (BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH) * 2 / 3,
+			(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH) * 2 / 3 };
 	/*
 	 * Calculate the actual rectangle the chessman occupied on the screen.
 	 */
 	SDL_Rect chessman_rect_on_screen(UCoord coord) {
 		assert(coord.x < MAP_SIZE.w && coord.y < MAP_SIZE.h);
-		constexpr Area AREA = { BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH * 2 / 3,
-				(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH) * 2 / 3 };
 		const UCoord central_point = chessman_coord_on_screen(coord);
 		return {
-			static_cast<int>(central_point.x - AREA.w / 2),
-			static_cast<int>(central_point.y - AREA.h / 2),
-			AREA.w,
-			AREA.h
+			static_cast<int>(central_point.x - CHESSMAN_AREA.w / 2),
+			static_cast<int>(central_point.y - CHESSMAN_AREA.h / 2),
+			CHESSMAN_AREA.w,
+			CHESSMAN_AREA.h
 		};
 	}
 
@@ -258,8 +262,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	}
 
 
-	void filledCircleRGBA(SDL_Renderer *render, int x, int y, int radius, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-		SDL_SetRenderDrawColor(render, r, g, b, a);
+	void filledCircleRGBA(SDL_Renderer *render, int x, int y, int radius) {
 		for (int w = 0; w < radius * 2; w++) {
 			for (int h = 0; h < radius * 2; h++) {
 				int dx = radius - w;
@@ -584,6 +587,10 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		Font *font;
 		ButtonManager *button_manager;
 
+		SDL_Texture *black_chessman_texture, *black_chessman_transparent_texture;
+		SDL_Texture *white_chessman_texture, *white_chessman_transparent_texture;
+
+
 		CoreGame game;
 
 		Game();
@@ -633,11 +640,49 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			game.clear();
 		});
 		button_manager->add_button(std::move(reset));
+
+		SDL_Surface *sur = SDL_CreateRGBSurface(0, CHESSMAN_AREA.w, CHESSMAN_AREA.h, 32,
+				0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF);
+		SDL_FillRect(sur, nullptr, SDL_MapRGBA(sur->format, 255, 255, 255, 0));
+		SDL_Renderer *sur_render = SDL_CreateSoftwareRenderer(sur);
+
+		// BLACK CHESSMAN TEXTURE
+		SDL_SetRenderDrawColor(sur_render, BLACK_CHESSMAN_COLOR.r,
+				BLACK_CHESSMAN_COLOR.g, BLACK_CHESSMAN_COLOR.b, BLACK_CHESSMAN_COLOR.a);
+		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, CHESSMAN_AREA.w / 2);
+		black_chessman_texture = SDL_CreateTextureFromSurface(render, sur);
+
+		// BLACK CHESSMAN TRANSPARENT TEXTURE
+		SDL_SetRenderDrawColor(sur_render, BLACK_CHESSMAN_COLOR.r,
+				BLACK_CHESSMAN_COLOR.g, BLACK_CHESSMAN_COLOR.b, 160);
+		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, CHESSMAN_AREA.w / 2);
+		black_chessman_transparent_texture = SDL_CreateTextureFromSurface(render, sur);
+
+		// WHITE CHESSMAN TEXTURE
+		SDL_SetRenderDrawColor(sur_render, WHITE_CHESSMAN_COLOR.r,
+				WHITE_CHESSMAN_COLOR.g, WHITE_CHESSMAN_COLOR.b, WHITE_CHESSMAN_COLOR.a);
+		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, CHESSMAN_AREA.w / 2);
+		white_chessman_texture = SDL_CreateTextureFromSurface(render, sur);
+
+		// WHITE CHESSMAN TRANSPARENT TEXTURE
+		SDL_SetRenderDrawColor(sur_render, WHITE_CHESSMAN_COLOR.r,
+				WHITE_CHESSMAN_COLOR.g, WHITE_CHESSMAN_COLOR.b, 190);
+		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, CHESSMAN_AREA.w / 2);
+		white_chessman_transparent_texture = SDL_CreateTextureFromSurface(render, sur);
+
+		SDL_DestroyRenderer(sur_render);
+		SDL_FreeSurface(sur);
 	}
 
 	Game::~Game() {
 		delete font;
 		delete button_manager;
+
+		SDL_DestroyTexture(black_chessman_texture);
+		SDL_DestroyTexture(black_chessman_transparent_texture);
+		SDL_DestroyTexture(white_chessman_texture);
+		SDL_DestroyTexture(white_chessman_transparent_texture);
+
 		SDL_DestroyRenderer(render);
 		SDL_DestroyWindow(window);
 		SDL_Quit();
@@ -674,7 +719,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				for(uint_type x = 0; x < MAP_SIZE.w; ++x) {
 					CoreGame::Unit unit = game[{x, y}];
 					SDL_Rect chessman_rect = chessman_rect_on_screen({x, y});
-					UCoord chessman_coord = chessman_coord_on_screen({x, y});
 					if(ucoord_in_rect(mouse_coord, chessman_rect)) {
 						selected_chessman = true;
 						selected_chessman_coord = {x, y};
@@ -683,27 +727,15 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 					if(unit == CoreGame::Unit::EMPTY) {
 						if(selected_chessman && selected_chessman_coord == UCoord{x, y}) {
 							if(game.is_white_turn())
-								filledCircleRGBA(render, chessman_coord.x, chessman_coord.y, chessman_rect.w / 2,
-										WHITE_CHESSMAN_COLOR.r,
-										WHITE_CHESSMAN_COLOR.g,
-										WHITE_CHESSMAN_COLOR.b, 190);
-							else
-								filledCircleRGBA(render, chessman_coord.x, chessman_coord.y, chessman_rect.w / 2,
-										BLACK_CHESSMAN_COLOR.r,
-										BLACK_CHESSMAN_COLOR.g,
-										BLACK_CHESSMAN_COLOR.b, 160);
+							SDL_RenderCopy(render, white_chessman_transparent_texture, nullptr, &chessman_rect);
+						else
+							SDL_RenderCopy(render, black_chessman_transparent_texture, nullptr, &chessman_rect);
 						}
 					} else {
 						if(unit == CoreGame::Unit::WHITE)
-							filledCircleRGBA(render, chessman_coord.x, chessman_coord.y, chessman_rect.w / 2,
-									WHITE_CHESSMAN_COLOR.r,
-									WHITE_CHESSMAN_COLOR.g,
-									WHITE_CHESSMAN_COLOR.b, 255);
+							SDL_RenderCopy(render, white_chessman_texture, nullptr, &chessman_rect);
 						else
-							filledCircleRGBA(render, chessman_coord.x, chessman_coord.y, chessman_rect.w / 2,
-									BLACK_CHESSMAN_COLOR.r,
-									BLACK_CHESSMAN_COLOR.g,
-									BLACK_CHESSMAN_COLOR.b, 255);
+							SDL_RenderCopy(render, black_chessman_texture, nullptr, &chessman_rect);
 					}
 
 				}
@@ -730,7 +762,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			}
 
 
-			SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND); // For that SDL_gfx will change the blend mode.
+			SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
 			button_manager->draw(true, mouse_coord);
 
 			SDL_RenderPresent(render);
