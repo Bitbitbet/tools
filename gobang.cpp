@@ -258,7 +258,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	}
 
 
-	void draw_circle(SDL_Renderer *render, int x, int y, int radius, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+	void filledCircleRGBA(SDL_Renderer *render, int x, int y, int radius, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 		SDL_SetRenderDrawColor(render, r, g, b, a);
 		for (int w = 0; w < radius * 2; w++) {
 			for (int h = 0; h < radius * 2; h++) {
@@ -683,7 +683,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 					if(unit == CoreGame::Unit::EMPTY) {
 						if(selected_chessman && selected_chessman_coord == UCoord{x, y}) {
 							if(game.is_white_turn())
-								draw_circle(render, chessman_coord.x, chessman_coord.y, chessman_rect.w / 2,
+								filledCircleRGBA(render, chessman_coord.x, chessman_coord.y, chessman_rect.w / 2,
 										WHITE_CHESSMAN_COLOR.r,
 										WHITE_CHESSMAN_COLOR.g,
 										WHITE_CHESSMAN_COLOR.b, 190);
@@ -691,7 +691,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 								filledCircleRGBA(render, chessman_coord.x, chessman_coord.y, chessman_rect.w / 2,
 										BLACK_CHESSMAN_COLOR.r,
 										BLACK_CHESSMAN_COLOR.g,
-										BLACK_CHESSMAN_COLOR.b, 190);
+										BLACK_CHESSMAN_COLOR.b, 160);
 						}
 					} else {
 						if(unit == CoreGame::Unit::WHITE)
@@ -725,7 +725,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 					chessman_coord_on_screen(game.get_rows().first),
 					chessman_coord_on_screen(game.get_rows().second)
 				};
-				SDL_SetRenderDrawColor(255, 100, 100 255);
+				SDL_SetRenderDrawColor(render, 255, 100, 100, 255);
 				SDL_RenderDrawLine(render, rows.first.x, rows.first.y, rows.second.x, rows.second.y);
 			}
 
