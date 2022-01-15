@@ -615,7 +615,9 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		button_manager = new ButtonManager(render, *font);
 
 		constexpr Area reset_area = Font::text_size("reset");
-		Button reset("reset", {0, BACKGROUND_BLANK_OUTOF_MAP_SIZE.h + REAL_MAP_SIZE.h, reset_area.w, reset_area.h});
+		Button reset("reset", {BACKGROUND_BLANK_OUTOF_MAP_SIZE.w,
+				BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 4 / 3 + REAL_MAP_SIZE.h,
+				reset_area.w, reset_area.h});
 		reset.set_on_click([this] (UCoord) {
 			game.clear();
 		});
@@ -1007,7 +1009,7 @@ namespace frontend_with_console {
 
 enum class Mode {
 	console, graphic
-} mode = Mode::console;
+} mode = Mode::graphic;
 
 /*
  * Process command line.
