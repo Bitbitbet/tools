@@ -1,7 +1,6 @@
 #include "argument_utils.h"
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_error.h>
-#include <SDL2/SDL_render.h>
+#include <SDL2/SDL2_gfxPrimitives.h>
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -300,7 +299,7 @@ namespace frontend_with_SDL2 {
 			return condidate[(index % 4) * 16 + (RAW_FONT_DATA[index / 4] - 'A')];
 		}
 
-		SDL_Color fore, back;
+		SDL_Color back;
 
 		SDL_Surface *font_surface;
 		SDL_Texture *font_texture;
@@ -308,7 +307,7 @@ namespace frontend_with_SDL2 {
 		SDL_Renderer *render;
 	};
 	Font::Font(SDL_PixelFormat *format, SDL_Renderer *render, SDL_Color color) :
-		fore(color), back(color.r == 0 && color.g == 0 && color.b == 0 ? SDL_Color{255, 255, 255} : SDL_Color{0, 0, 0}) {
+		back(color.r == 0 && color.g == 0 && color.b == 0 ? SDL_Color{255, 255, 255} : SDL_Color{0, 0, 0}) {
 
 		font_surface = SDL_CreateRGBSurfaceWithFormat(0,
 				FONT_CHARACTER_SIZE.w * CHARACTER_COUNT * SCALE_TIME,

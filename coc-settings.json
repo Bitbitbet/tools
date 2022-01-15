@@ -34,7 +34,8 @@
 		"variable": "\ue71b"
 	},
 	"coc.preferences.formatOnSaveFiletypes": [
-		"json"
+		"json",
+		"html"
 	],
 	"explorer.quitOnOpen": true,
 	"explorer.icon.enableNerdfont": true,

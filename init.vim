@@ -6,6 +6,7 @@ Plug 'vim-airline/vim-airline-themes'
 Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
 Plug 'ajmwagar/vim-deus'
+Plug 'Yggdroot/indentLine'
 
 call plug#end()
 
