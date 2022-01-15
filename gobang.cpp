@@ -199,15 +199,17 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	 */
 	UCoord chessman_coord_on_screen(UCoord coord) {
 		assert(coord.x < MAP_SIZE.w && coord.y < MAP_SIZE.h);
-		return {BACKGROUND_BLANK_OUTOF_MAP_SIZE.w + BACKGROUND_BORDER_WIDTH + (coord.x + 1) *
-				(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH) - BACKGROUND_LINE_WIDTH / 2,
+		return {
+			BACKGROUND_BLANK_OUTOF_MAP_SIZE.w + BACKGROUND_BORDER_WIDTH + (coord.x + 1) *
+				BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + coord.x * BACKGROUND_LINE_WIDTH + BACKGROUND_LINE_WIDTH / 2,
 			BACKGROUND_BLANK_OUTOF_MAP_SIZE.h + BACKGROUND_BORDER_WIDTH + (coord.y + 1) *
-			(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH) - BACKGROUND_LINE_WIDTH / 2};
+				BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + coord.y * BACKGROUND_LINE_WIDTH + BACKGROUND_LINE_WIDTH / 2
+		};
 	}
 	
 
-	constexpr Area CHESSMAN_AREA = { (BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH) * 2 / 3,
-			(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH) * 2 / 3 };
+	constexpr Area CHESSMAN_AREA = { (BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH) * 3 / 4,
+			(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH) * 3 / 4 };
 	/*
 	 * Calculate the actual rectangle the chessman occupied on the screen.
 	 */
@@ -719,6 +721,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				for(uint_type x = 0; x < MAP_SIZE.w; ++x) {
 					CoreGame::Unit unit = game[{x, y}];
 					SDL_Rect chessman_rect = chessman_rect_on_screen({x, y});
+					// SDL_SetRenderDrawColor(render, 0, 0, 255, 255);
+					// SDL_RenderFillRect(render, &chessman_rect);
 					if(ucoord_in_rect(mouse_coord, chessman_rect)) {
 						selected_chessman = true;
 						selected_chessman_coord = {x, y};
@@ -727,9 +731,9 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 					if(unit == CoreGame::Unit::EMPTY) {
 						if(selected_chessman && selected_chessman_coord == UCoord{x, y}) {
 							if(game.is_white_turn())
-							SDL_RenderCopy(render, white_chessman_transparent_texture, nullptr, &chessman_rect);
-						else
-							SDL_RenderCopy(render, black_chessman_transparent_texture, nullptr, &chessman_rect);
+								SDL_RenderCopy(render, white_chessman_transparent_texture, nullptr, &chessman_rect);
+							else
+								SDL_RenderCopy(render, black_chessman_transparent_texture, nullptr, &chessman_rect);
 						}
 					} else {
 						if(unit == CoreGame::Unit::WHITE)
@@ -737,7 +741,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 						else
 							SDL_RenderCopy(render, black_chessman_texture, nullptr, &chessman_rect);
 					}
-
 				}
 			}
 
