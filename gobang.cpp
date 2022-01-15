@@ -1,10 +1,17 @@
 #include "argument_utils.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL2_gfxPrimitives.h>
+#include <SDL2/SDL_events.h>
+#include <SDL2/SDL_mouse.h>
+#include <SDL2/SDL_render.h>
+#include <SDL2/SDL_surface.h>
+#include <SDL2/SDL_video.h>
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <functional>
+#include <initializer_list>
 #include <string_view>
 #include <iostream>
 
@@ -101,7 +108,7 @@ private:
 
 	Unit map[MAP_SIZE.w * MAP_SIZE.h];
 	std::pair<UCoord, UCoord> rows; /* Contains the start coord and the end coord
-			  of a row that is long enough to win. */
+			of a row that is long enough to win. */
 	bool m_is_white_turn;
 	Status m_status;
 };
@@ -150,12 +157,14 @@ void CoreGame::place(UCoord c) {
 			m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
 			rows.first = c;
 			switch(i) {
-				case 0: rows.second = {c.x - AMOUNT_OF_ROWS + 1, c.y - AMOUNT_OF_ROWS + 1}; break;
-				case 1: rows.second = {c.x, c.y - AMOUNT_OF_ROWS + 1}; break;
-				case 2: rows.second = {c.x + AMOUNT_OF_ROWS - 1, c.y - AMOUNT_OF_ROWS + 1}; break;
-				case 3: rows.second = {c.x - AMOUNT_OF_ROWS + 1, c.y + AMOUNT_OF_ROWS - 1}; break;
-				case 4: rows.second = {c.x, c.y + AMOUNT_OF_ROWS - 1}; break;
-				case 5: rows.second = {c.x + AMOUNT_OF_ROWS - 1, c.y + AMOUNT_OF_ROWS - 1}; break;
+				case 0: rows.second = {c.x - (AMOUNT_OF_ROWS - 1), c.y}; break;
+				case 1: rows.second = {c.x - (AMOUNT_OF_ROWS - 1), c.y - (AMOUNT_OF_ROWS - 1)}; break;
+				case 2: rows.second = {c.x, c.y - AMOUNT_OF_ROWS + 1}; break;
+				case 3: rows.second = {c.x + (AMOUNT_OF_ROWS - 1), c.y - (AMOUNT_OF_ROWS - 1)}; break;
+				case 4: rows.second = {c.x + (AMOUNT_OF_ROWS - 1), c.y}; break;
+				case 5: rows.second = {c.x - (AMOUNT_OF_ROWS - 1), c.y + (AMOUNT_OF_ROWS - 1)}; break;
+				case 6: rows.second = {c.x, c.y + (AMOUNT_OF_ROWS - 1)}; break;
+				case 7: rows.second = {c.x + (AMOUNT_OF_ROWS - 1), c.y + (AMOUNT_OF_ROWS - 1)}; break;
 			}
 			return;
 		}
@@ -165,58 +174,96 @@ void CoreGame::place(UCoord c) {
 }
 
 
-namespace frontend_with_SDL2 {
-	namespace background {
-		constexpr struct SDL_Color BACKGROUND_COLOR = {255, 228, 181};
-		constexpr uint_type LINE_WIDTH = 3;
-		constexpr Area BLANK_BETWEEN_LINES_SIZE = {30, 30};
-		constexpr uint_type BROAD_WIDTH = 6;
-		constexpr Area BLANK_OUTOF_MAP_SIZE = {20, 60};
+namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_gfx
+	constexpr SDL_Color WHITE_CHESSMAN_COLOR = {220, 220, 255, 255};
+	constexpr SDL_Color BLACK_CHESSMAN_COLOR = {10, 10, 10, 255};
 
-	}
+	constexpr SDL_Color BACKGROUND_COLOR = {230, 205, 163, 255};
+	constexpr uint_type BACKGROUND_LINE_WIDTH = 3;
+	constexpr Area BACKGROUND_BLANK_BETWEEN_LINES_SIZE = {30, 30};
+	constexpr uint_type BACKGROUND_BORDER_WIDTH = 6;
+	constexpr Area BACKGROUND_BLANK_OUTOF_MAP_SIZE = {20, 60};
+	constexpr Area INNER_MAP_SIZE = {BACKGROUND_LINE_WIDTH * 15 + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w * 16,
+			BACKGROUND_LINE_WIDTH * 15 + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h * 16};
+	constexpr Area REAL_MAP_SIZE = {INNER_MAP_SIZE.w + BACKGROUND_BORDER_WIDTH * 2,
+			INNER_MAP_SIZE.h + BACKGROUND_BORDER_WIDTH * 2};
+
 	constexpr Area WINDOW_SIZE = {
-		background::LINE_WIDTH * MAP_SIZE.w + background::BLANK_BETWEEN_LINES_SIZE.w *
+		BACKGROUND_LINE_WIDTH * MAP_SIZE.w + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w *
 			(MAP_SIZE.w + 1) +
-			background::BROAD_WIDTH * 2 + background::BLANK_OUTOF_MAP_SIZE.w * 2,
-		background::LINE_WIDTH * MAP_SIZE.h + background::BLANK_BETWEEN_LINES_SIZE.h *
+			BACKGROUND_BORDER_WIDTH * 2 + BACKGROUND_BLANK_OUTOF_MAP_SIZE.w * 2,
+		BACKGROUND_LINE_WIDTH * MAP_SIZE.h + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h *
 			(MAP_SIZE.h + 1) +
-			background::BROAD_WIDTH * 2 + background::BLANK_OUTOF_MAP_SIZE.h * 2};
+			BACKGROUND_BORDER_WIDTH * 2 + BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 2};
+
+	/*
+	 * Calculate the actual coord of chessman on the screen, according to the coord of chessman on the map.
+	 */
+	UCoord chessman_coord_on_screen(UCoord coord) {
+		assert(coord.x < MAP_SIZE.w && coord.y < MAP_SIZE.h);
+		return {BACKGROUND_BLANK_OUTOF_MAP_SIZE.w + BACKGROUND_BORDER_WIDTH + (coord.x + 1) *
+				(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH) - BACKGROUND_LINE_WIDTH / 2,
+			BACKGROUND_BLANK_OUTOF_MAP_SIZE.h + BACKGROUND_BORDER_WIDTH + (coord.y + 1) *
+			(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH) - BACKGROUND_LINE_WIDTH / 2};
+	}
+	
+	/*
+	 * Calculate the actual rectangle the chessman occupied on the screen.
+	 */
+	SDL_Rect chessman_rect_on_screen(UCoord coord) {
+		assert(coord.x < MAP_SIZE.w && coord.y < MAP_SIZE.h);
+		constexpr Area AREA = { BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH * 2 / 3,
+				(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH) * 2 / 3 };
+		const UCoord central_point = chessman_coord_on_screen(coord);
+		return {
+			static_cast<int>(central_point.x - AREA.w / 2),
+			static_cast<int>(central_point.y - AREA.h / 2),
+			AREA.w,
+			AREA.h
+		};
+	}
+
+	constexpr static bool ucoord_in_rect(UCoord coord, SDL_Rect rect) {
+		int x = coord.x;
+		int y = coord.y;
+		return x >= rect.x && y >= rect.y && x - rect.x < rect.w && y - rect.y < rect.h;
+	}
+
+
 	/*
 	 * Generate the background surface.
 	 * Return the surface handle, which requires to be freed by SDL_FreeSurface manually.
 	 */
 	SDL_Surface *generate_background_surface(SDL_PixelFormat *format) {
-		using namespace background;
 		const auto background_color = SDL_MapRGB(format, BACKGROUND_COLOR.r,
 				BACKGROUND_COLOR.g, BACKGROUND_COLOR.b);
 		const auto black_color = SDL_MapRGB(format, 50, 50, 50);
 
-		constexpr Area INNER_MAP_SIZE = {LINE_WIDTH * 15 + BLANK_BETWEEN_LINES_SIZE.w * 16,
-				LINE_WIDTH * 15 + BLANK_BETWEEN_LINES_SIZE.h * 16};
-		constexpr Area REAL_MAP_SIZE = {INNER_MAP_SIZE.w + BROAD_WIDTH * 2,
-				INNER_MAP_SIZE.h + BROAD_WIDTH * 2};
 
 		SDL_Surface *background_surface = SDL_CreateRGBSurfaceWithFormat(0, WINDOW_SIZE.w, WINDOW_SIZE.h, 0, format->format);
 		SDL_Rect r = {0, 0, WINDOW_SIZE.w, WINDOW_SIZE.h};
 		SDL_FillRect(background_surface, &r, background_color);
 	
-		r = {BLANK_OUTOF_MAP_SIZE.w, BLANK_OUTOF_MAP_SIZE.h,
+		r = {BACKGROUND_BLANK_OUTOF_MAP_SIZE.w, BACKGROUND_BLANK_OUTOF_MAP_SIZE.h,
 			REAL_MAP_SIZE.w, REAL_MAP_SIZE.h};
 		SDL_FillRect(background_surface, &r, black_color);
 		for(size_t x = 0; x < MAP_SIZE.w + 1; ++x) {
 			for(size_t y = 0; y < MAP_SIZE.h + 1; ++y) {
 				r = {
-					static_cast<int>(BLANK_OUTOF_MAP_SIZE.w + BROAD_WIDTH + x *
-					(BLANK_BETWEEN_LINES_SIZE.w + LINE_WIDTH)),
-					static_cast<int>(BLANK_OUTOF_MAP_SIZE.h + BROAD_WIDTH + y *
-					(BLANK_BETWEEN_LINES_SIZE.h + LINE_WIDTH)),
-					BLANK_BETWEEN_LINES_SIZE.w, BLANK_BETWEEN_LINES_SIZE.h
+					static_cast<int>(BACKGROUND_BLANK_OUTOF_MAP_SIZE.w + BACKGROUND_BORDER_WIDTH + x *
+					(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH)),
+					static_cast<int>(BACKGROUND_BLANK_OUTOF_MAP_SIZE.h + BACKGROUND_BORDER_WIDTH + y *
+					(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH)),
+					BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w, BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h
 				};
 				SDL_FillRect(background_surface, &r, background_color);
 			}
 		}
 		return background_surface;
 	}
+
+
+
 
 	class Font {
 	private:
@@ -284,6 +331,8 @@ namespace frontend_with_SDL2 {
 				const string_view string,
 				Area extra_advance = DEFAULT_EXTRA_ADVANCE) const;
 
+		constexpr static Area text_size(string_view str, Area extra_advance = DEFAULT_EXTRA_ADVANCE);
+
 	private:
 
 		/*
@@ -307,7 +356,7 @@ namespace frontend_with_SDL2 {
 		SDL_Renderer *render;
 	};
 	Font::Font(SDL_PixelFormat *format, SDL_Renderer *render, SDL_Color color) :
-		back(color.r == 0 && color.g == 0 && color.b == 0 ? SDL_Color{255, 255, 255} : SDL_Color{0, 0, 0}) {
+		back(color.r == 0 && color.g == 0 && color.b == 0 ? SDL_Color{255, 255, 255, 255} : SDL_Color{0, 0, 0, 255}) {
 
 		font_surface = SDL_CreateRGBSurfaceWithFormat(0,
 				FONT_CHARACTER_SIZE.w * CHARACTER_COUNT * SCALE_TIME,
@@ -347,7 +396,7 @@ namespace frontend_with_SDL2 {
 		dstrect.x = pos.x;
 		dstrect.y = pos.y;
 		SDL_Rect region{ static_cast<int>(pos.x), static_cast<int>(pos.y), 0, 1};
-		size_t region_width_temp = 0;
+		int region_width_temp = 0;
 		for(char c : str) {
 			c = toupper(c);
 			bool right_advance = false, down_advance = false;
@@ -384,23 +433,7 @@ namespace frontend_with_SDL2 {
 		return region;
 	}
 	SDL_Surface *Font::create_surface_from_text(SDL_PixelFormat *format, const string_view str, Area extra_advance) const {
-		Area surface_size = {0, 1};
-		{
-			uint_type width = 0;
-			for(char c : str) {
-				if(c == '\n') {
-					width = 0;
-					++surface_size.h;
-				} else {
-					++width;
-					if(width > surface_size.w) {
-						surface_size.w = width;
-					}
-				}
-			}
-			if(surface_size.w != 0) surface_size.w = surface_size.w * (CHARACTER_SIZE.w + extra_advance.w) - extra_advance.w;
-			surface_size.h = surface_size.h * (CHARACTER_SIZE.h + extra_advance.h) - extra_advance.h;
-		}
+		Area surface_size = text_size(str, extra_advance);
 		SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, surface_size.w, surface_size.h, 0, format->format);
 		SDL_Rect srcrect{0, 0, CHARACTER_SIZE.w, CHARACTER_SIZE.h}, dstrect{0, 0, CHARACTER_SIZE.w, CHARACTER_SIZE.h};
 		for(char c : str) {
@@ -429,6 +462,98 @@ namespace frontend_with_SDL2 {
 		SDL_SetColorKey(surface, SDL_TRUE, SDL_MapRGB(format, back.r, back.g, back.b));
 		return surface;
 	}
+
+	constexpr Area Font::text_size(string_view str, Area extra_advance) {
+		Area area = {0, 0}, text_area = {0, 1};
+		uint_type text_width_temp = 0;
+		for(char c : str) {
+			if(c == '\n') {
+				text_area.h += 1;
+				text_width_temp = 0;
+			} else {
+				++text_width_temp;
+				if(text_width_temp > text_area.w) text_area.w = text_width_temp;
+			}
+		}
+		if(text_area.w != 0) area.w = text_area.w * (FONT_CHARACTER_SIZE.w * SCALE_TIME + extra_advance.w) - extra_advance.w;
+		area.h = text_area.h * (FONT_CHARACTER_SIZE.h * SCALE_TIME + extra_advance.h) - extra_advance.h;
+		return area;
+	}
+
+
+	class ButtonManager;
+
+	class Button {
+		friend class ButtonManager;
+
+		using on_click_callback_t = void(UCoord);
+	public:
+		Button(std::string_view button_title, const SDL_Rect button_region) :
+			region(button_region), title(button_title) {}
+		Button(std::string_view button_title, const SDL_Rect button_region, std::function<on_click_callback_t> onclick) :
+			region(button_region), title(button_title), on_click_callback(std::move(onclick)) {}
+		Button(Button &&b) : region(b.region), title(std::move(b.title)), on_click_callback(std::move(b.on_click_callback)) {}
+
+		Button(const Button &) = delete;
+		Button &operator=(const Button &) = delete;
+
+		void set_on_click(std::function<on_click_callback_t> func) {
+			on_click_callback = std::move(func);
+		}
+	private:
+		SDL_Rect region;
+		std::string_view title;
+		std::function<on_click_callback_t> on_click_callback;
+	};
+
+	class ButtonManager {
+		// constexpr static SDL_Color BUTTON_BORDER_COLOR = {30, 30, 30, 255};
+	public:
+		ButtonManager(SDL_Renderer *render_, const Font &font_) : render(render_), font(font_) {}
+		ButtonManager(const ButtonManager &) = delete;
+		ButtonManager &operator=(const ButtonManager &) = delete;
+
+		void add_button(Button &&b) {
+			buttons.emplace_back(std::move(b));
+		}
+
+		void draw(bool mouse_hover = false, UCoord mouse_coord = {0, 0}) const;
+		bool click_event(UCoord mouse_coord);
+	private:
+		std::vector<Button> buttons;
+		SDL_Renderer *render;
+		const Font &font;
+	};
+
+	void ButtonManager::draw(bool mouse_hover, UCoord mouse_coord) const {
+		for(const Button &b : buttons) {
+			font.render_text(b.title, {
+				b.region.x + b.region.w / 2 - Font::text_size(b.title).w / 2,
+				static_cast<uint_type>(b.region.y)
+			});
+			// SDL_SetRenderDrawColor(render, BUTTON_BORDER_COLOR.r,
+			// 		BUTTON_BORDER_COLOR.g,
+			// 		BUTTON_BORDER_COLOR.b,
+			// 		BUTTON_BORDER_COLOR.a);
+			// SDL_RenderDrawRect(render, &b.region);
+			if(mouse_hover) {
+				if(ucoord_in_rect(mouse_coord, b.region)) {
+					SDL_SetRenderDrawColor(render, 255, 255, 255, 60);
+					SDL_RenderFillRect(render, &b.region);
+				}
+			}
+		}
+	}
+	bool ButtonManager::click_event(UCoord mouse_coord) {
+		for(const Button &b : buttons) {
+			if(ucoord_in_rect(mouse_coord, b.region)) {
+				b.on_click_callback(mouse_coord);
+				return true;
+			}
+		}
+		return false;
+	}
+
 	
 
 	/*
@@ -451,6 +576,7 @@ namespace frontend_with_SDL2 {
 		SDL_Renderer *render;
 		SDL_Texture *background_texture;
 		Font *font;
+		ButtonManager *button_manager;
 
 		CoreGame game;
 
@@ -482,17 +608,28 @@ namespace frontend_with_SDL2 {
 				exit(1);
 			}
 		}
+		SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
 		SDL_Surface *screen = SDL_GetWindowSurface(window);
 
 		SDL_Surface *background_surface = generate_background_surface(screen->format);
 		background_texture = SDL_CreateTextureFromSurface(render, background_surface);
 		SDL_FreeSurface(background_surface);
 
-		font = new Font(screen->format, render, {0x20, 0x20, 0x20});
+		font = new Font(screen->format, render, {0x20, 0x20, 0x20, 0xFF});
+
+		button_manager = new ButtonManager(render, *font);
+
+		constexpr Area reset_area = Font::text_size("reset");
+		Button reset("reset", {0, BACKGROUND_BLANK_OUTOF_MAP_SIZE.h + REAL_MAP_SIZE.h, reset_area.w, reset_area.h});
+		reset.set_on_click([this] (UCoord) {
+			game.clear();
+		});
+		button_manager->add_button(std::move(reset));
 	}
 
 	Game::~Game() {
 		delete font;
+		delete button_manager;
 		SDL_DestroyRenderer(render);
 		SDL_DestroyWindow(window);
 		SDL_Quit();
@@ -500,23 +637,95 @@ namespace frontend_with_SDL2 {
 
 	void Game::start() {
 		while(true) {
+			SDL_SetRenderDrawColor(render, BACKGROUND_COLOR.r, BACKGROUND_COLOR.g, BACKGROUND_COLOR.b, 255);
+			SDL_RenderCopy(render, background_texture, nullptr, nullptr);
+
+			UCoord mouse_coord; // Get mouse state.
+			{
+				int x, y;
+				SDL_GetMouseState(&x, &y);
+				mouse_coord.x = x;
+				mouse_coord.y = y;
+			}
+
+			bool mouse_down = false; // Handle events.
 			SDL_Event event;
 			while(SDL_PollEvent(&event)) {
 				switch(event.type) {
 					case SDL_QUIT:
 						return;
+					case SDL_MOUSEBUTTONDOWN:
+						mouse_down = true;
+						break;
 				}
 			}
 
-			SDL_SetRenderDrawColor(render, background::BACKGROUND_COLOR.r, background::BACKGROUND_COLOR.g, background::BACKGROUND_COLOR.b, 255);
-			SDL_RenderClear(render);
-			SDL_RenderCopy(render, background_texture, nullptr, nullptr);
-			SDL_Rect r = font->render_text("TODO MEANS\n THERES NOTHING\n TO DO", {0, 0});
-			SDL_SetRenderDrawColor(render, 0, 0, 0, 255);
-			SDL_RenderDrawRect(render, &r);
+			bool selected_chessman = false;
+			UCoord selected_chessman_coord;
+			for(uint_type y = 0; y < MAP_SIZE.h; ++y) {
+				for(uint_type x = 0; x < MAP_SIZE.w; ++x) {
+					CoreGame::Unit unit = game[{x, y}];
+					SDL_Rect chessman_rect = chessman_rect_on_screen({x, y});
+					UCoord chessman_coord = chessman_coord_on_screen({x, y});
+					if(ucoord_in_rect(mouse_coord, chessman_rect)) {
+						selected_chessman = true;
+						selected_chessman_coord = {x, y};
+					}
 
+					if(unit == CoreGame::Unit::EMPTY) {
+						if(selected_chessman && selected_chessman_coord == UCoord{x, y}) {
+							if(game.is_white_turn())
+								filledCircleRGBA(render, chessman_coord.x, chessman_coord.y, chessman_rect.w / 2,
+										WHITE_CHESSMAN_COLOR.r,
+										WHITE_CHESSMAN_COLOR.g,
+										WHITE_CHESSMAN_COLOR.b, 190);
+							else
+								filledCircleRGBA(render, chessman_coord.x, chessman_coord.y, chessman_rect.w / 2,
+										BLACK_CHESSMAN_COLOR.r,
+										BLACK_CHESSMAN_COLOR.g,
+										BLACK_CHESSMAN_COLOR.b, 190);
+						}
+					} else {
+						if(unit == CoreGame::Unit::WHITE)
+							filledCircleRGBA(render, chessman_coord.x, chessman_coord.y, chessman_rect.w / 2,
+									WHITE_CHESSMAN_COLOR.r,
+									WHITE_CHESSMAN_COLOR.g,
+									WHITE_CHESSMAN_COLOR.b, 255);
+						else
+							filledCircleRGBA(render, chessman_coord.x, chessman_coord.y, chessman_rect.w / 2,
+									BLACK_CHESSMAN_COLOR.r,
+									BLACK_CHESSMAN_COLOR.g,
+									BLACK_CHESSMAN_COLOR.b, 255);
+					}
+
+				}
+			}
+
+
+			if(mouse_down) {
+				if(!button_manager->click_event(mouse_coord)) {
+					if(game.status() == CoreGame::Status::NONE) {
+						if(selected_chessman && game[selected_chessman_coord] == CoreGame::Unit::EMPTY) {
+							game.place(selected_chessman_coord);
+						}
+					}
+				}
+			}
+
+			if(game.status() != CoreGame::Status::NONE) {
+				std::pair<UCoord, UCoord> rows = {
+					chessman_coord_on_screen(game.get_rows().first),
+					chessman_coord_on_screen(game.get_rows().second)
+				};
+				lineRGBA(render, rows.first.x, rows.first.y, rows.second.x, rows.second.y, 255, 100, 100, 255);
+			}
+
+
+			SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND); // For that SDL_gfx will change the blend mode.
+			button_manager->draw(true, mouse_coord);
 
 			SDL_RenderPresent(render);
+			SDL_Delay(10);
 		}
 	}
 }
