@@ -752,13 +752,17 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				}
 			}
 
-			if(game.status() != CoreGame::Status::NONE) {
+			constexpr UCoord TEXT_POS = {BACKGROUND_BLANK_OUTOF_MAP_SIZE.w, BACKGROUND_BLANK_OUTOF_MAP_SIZE.h / 3};
+			if(game.status() == CoreGame::Status::NONE) {
+				font->render_text(game.is_white_turn() ? "whites turn" : "blacks turn", TEXT_POS);
+			} else { //Some one won
 				std::pair<UCoord, UCoord> rows = {
 					chessman_coord_on_screen(game.get_rows().first),
 					chessman_coord_on_screen(game.get_rows().second)
 				};
 				SDL_SetRenderDrawColor(render, 255, 100, 100, 255);
 				SDL_RenderDrawLine(render, rows.first.x, rows.first.y, rows.second.x, rows.second.y);
+				font->render_text(game.is_white_turn() ? "white won" : "black won", TEXT_POS);
 			}
 
 
