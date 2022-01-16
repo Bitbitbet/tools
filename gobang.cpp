@@ -1,3 +1,4 @@
+#include <SDL2/SDL_render.h>
 #include <vector>
 #include <iostream>
 #include <functional>
@@ -93,7 +94,11 @@ public:
 private:
 
 	Unit &get(UCoord c) {
-		assert(c.x < MAP_SIZE.w && c.y < MAP_SIZE.h);
+		// assert(c.x < MAP_SIZE.w && c.y < MAP_SIZE.h);
+		if(c.x >= MAP_SIZE.w || c.y >= MAP_SIZE.h) {
+			log_error("{%d, %d}", (int)c.x, (int)c.y);
+			exit(1);
+		}
 		return map[c.x * MAP_SIZE.w + c.y];
 	}
 	const Unit &get(UCoord c) const {
@@ -120,49 +125,78 @@ void CoreGame::place(UCoord c) {
 
 	get(c) = m_is_white_turn ? Unit::WHITE : Unit::BLACK;
 
-	// Check whether there's rows
-	bool results[8] = {true, true, true, true,
-		true, true, true, true}; // Check in eight ways
-	for(uint_type i = 1; i < AMOUNT_OF_ROWS; ++i) {
-		for(uint_type j = 0; j < 8; ++j) {
-			if(!results[j]) continue;
-			UCoord condidate_coord;
-			switch(j) {
-				case 0: condidate_coord = {c.x - i, c.y}; break;
-				case 1: condidate_coord = {c.x - i, c.y - i}; break;
-				case 2: condidate_coord = {c.x, c.y - i}; break;
-				case 3: condidate_coord = {c.x + i, c.y - i}; break;
-				case 4: condidate_coord = {c.x + i, c.y}; break;
-				case 5: condidate_coord = {c.x - i, c.y + i}; break;
-				case 6: condidate_coord = {c.x, c.y + i}; break;
-				case 7: condidate_coord = {c.x + i, c.y + i}; break;
+	UCoord start;
+	UCoord iter = {0, c.y}; //Search in direction: -
+	uint_type row_count = 0;
+	for(; iter.x < MAP_SIZE.w; ++iter.x) {
+		if(get(iter) == get(c)) {
+			if(row_count == 0) {
+				start = iter;
 			}
-			if(condidate_coord.x >= MAP_SIZE.w ||
-					condidate_coord.y >= MAP_SIZE.h) {
-				results[j] = false;
-				continue;
+			++row_count;
+			if(row_count == AMOUNT_OF_ROWS) { // someone won
+				rows.first = start;
+				rows.second = iter;
+				m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
+				return;
 			}
-			if(get(condidate_coord) != get(c)) {
-				results[j] = false;
-			}
+		} else {
+			row_count = 0;
 		}
 	}
-	for(uint_type i = 0; i < 8; ++i) {
-		if(results[i]) {
-			m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
-			rows.first = c;
-			switch(i) {
-				case 0: rows.second = {c.x - (AMOUNT_OF_ROWS - 1), c.y}; break;
-				case 1: rows.second = {c.x - (AMOUNT_OF_ROWS - 1), c.y - (AMOUNT_OF_ROWS - 1)}; break;
-				case 2: rows.second = {c.x, c.y - AMOUNT_OF_ROWS + 1}; break;
-				case 3: rows.second = {c.x + (AMOUNT_OF_ROWS - 1), c.y - (AMOUNT_OF_ROWS - 1)}; break;
-				case 4: rows.second = {c.x + (AMOUNT_OF_ROWS - 1), c.y}; break;
-				case 5: rows.second = {c.x - (AMOUNT_OF_ROWS - 1), c.y + (AMOUNT_OF_ROWS - 1)}; break;
-				case 6: rows.second = {c.x, c.y + (AMOUNT_OF_ROWS - 1)}; break;
-				case 7: rows.second = {c.x + (AMOUNT_OF_ROWS - 1), c.y + (AMOUNT_OF_ROWS - 1)}; break;
+	iter = c.x > c.y ? UCoord{c.x - c.y, 0} : UCoord{0, c.y - c.x}; // Search in direction: '\'
+	row_count = 0;
+	for(; iter.x < MAP_SIZE.w && iter.y < MAP_SIZE.h; ++iter.x, ++iter.y) {
+		if(get(iter) == get(c)) {
+			if(row_count == 0) {
+				start = iter;
 			}
-			return;
+			++row_count;
+			if(row_count == AMOUNT_OF_ROWS) { // someone won
+				rows.first = start;
+				rows.second = iter;
+				m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
+				return;
+			}
+		} else {
+			row_count = 0;
 		}
+	}
+	iter = {c.x, 0}; // Search in direction: |
+	row_count = 0;
+	for(; iter.y < MAP_SIZE.h; ++iter.y) {
+		if(get(iter) == get(c)) {
+			if(row_count == 0) {
+				start = iter;
+			}
+			++row_count;
+			if(row_count == AMOUNT_OF_ROWS) { // someone won
+				rows.first = start;
+				rows.second = iter;
+				m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
+				return;
+			}
+		} else {
+			row_count = 0;
+		}
+	}
+	iter = (MAP_SIZE.w - 1 - c.x) > c.y ? UCoord{c.x + c.y, 0} : UCoord{MAP_SIZE.w - 1, c.y - (MAP_SIZE.w - 1 - c.x)};
+	row_count = 0; // Search in direction: /
+	for(; iter.x < MAP_SIZE.w && iter.y < MAP_SIZE.h; --iter.x, ++iter.y) {
+			if(get(iter) == get(c)) {
+				if(row_count == 0) {
+					start = iter;
+				}
+				++row_count;
+				if(row_count == AMOUNT_OF_ROWS) { // someone won
+					rows.first = start;
+					rows.second = iter;
+					m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
+					return;
+				}
+			} else {
+				row_count = 0;
+			}
 	}
 
 	m_is_white_turn = !m_is_white_turn;
@@ -171,7 +205,7 @@ void CoreGame::place(UCoord c) {
 
 namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_gfx
 	constexpr SDL_Color WHITE_CHESSMAN_COLOR = {220, 220, 255, 255};
-	constexpr SDL_Color BLACK_CHESSMAN_COLOR = {10, 10, 10, 255};
+	constexpr SDL_Color BLACK_CHESSMAN_COLOR = {40, 40, 40, 255};
 
 	constexpr SDL_Color BACKGROUND_COLOR = {230, 205, 163, 255};
 	constexpr uint_type BACKGROUND_LINE_WIDTH = 3;
@@ -227,6 +261,31 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		return x >= rect.x && y >= rect.y && x - rect.x < rect.w && y - rect.y < rect.h;
 	}
 
+	void filledCircleRGBA(SDL_Surface *sur, int x, int y, int radius, Uint32 color) {
+		for (int w = 0; w < radius * 2; w++) {
+			for (int h = 0; h < radius * 2; h++) {
+				int dx = radius - w;
+				int dy = radius - h;
+				if ((dx*dx + dy*dy) <= (radius * radius)) {
+					SDL_Rect r{x + dx, y + dy, 1, 1};
+					SDL_FillRect(sur, &r, color);
+				}
+			}
+		}
+	}
+
+	void filledCircleRGBA(SDL_Renderer *render, int x, int y, int radius) {
+		for (int w = 0; w < radius * 2; w++) {
+			for (int h = 0; h < radius * 2; h++) {
+				int dx = radius - w;
+				int dy = radius - h;
+				if ((dx*dx + dy*dy) <= (radius * radius)) {
+					SDL_RenderDrawPoint(render, x + dx, y + dy);
+				}
+			}
+		}
+	}
+
 
 	/*
 	 * Generate the background surface.
@@ -257,21 +316,18 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				SDL_FillRect(background_surface, &r, background_color);
 			}
 		}
+		UCoord coords[4] = {
+			chessman_coord_on_screen({2, 2}),
+			chessman_coord_on_screen({MAP_SIZE.w - 3, 2}),
+			chessman_coord_on_screen({2, MAP_SIZE.h - 3}),
+			chessman_coord_on_screen({MAP_SIZE.w - 3, MAP_SIZE.h - 3}),
+		};
+		for(UCoord coord : coords) {
+			filledCircleRGBA(background_surface, coord.x, coord.y, BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w / 10, black_color);
+		}
 		return background_surface;
 	}
 
-
-	void filledCircleRGBA(SDL_Renderer *render, int x, int y, int radius) {
-		for (int w = 0; w < radius * 2; w++) {
-			for (int h = 0; h < radius * 2; h++) {
-				int dx = radius - w;
-				int dy = radius - h;
-				if ((dx*dx + dy*dy) <= (radius * radius)) {
-					SDL_RenderDrawPoint(render, x + dx, y + dy);
-				}
-			}
-		}
-	}
 
 	class Font {
 	private:
@@ -589,6 +645,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		SDL_Texture *black_chessman_texture, *black_chessman_transparent_texture;
 		SDL_Texture *white_chessman_texture, *white_chessman_transparent_texture;
 
+		bool request_stop;
+
 
 		CoreGame game;
 
@@ -596,6 +654,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	};
 
 	Game::Game() {
+		request_stop = false;
 		// Initialize SDL2
 		if(SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO) < 0) {
 			log_error("Error initializing SDL2: %s.", SDL_GetError());
@@ -629,7 +688,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		font = new Font(screen->format, render, {0x20, 0x20, 0x20, 0xFF});
 
-		button_manager = new ButtonManager(render, *font);
+
+		button_manager = new ButtonManager(render, *font); // Buttons
 
 		constexpr Area reset_area = Font::text_size("reset");
 		Button reset("reset", {BACKGROUND_BLANK_OUTOF_MAP_SIZE.w,
@@ -639,6 +699,17 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			game.clear();
 		});
 		button_manager->add_button(std::move(reset));
+
+		constexpr Area exit_area = Font::text_size("exit");
+		Button exit("exit", {WINDOW_SIZE.w - BACKGROUND_BLANK_OUTOF_MAP_SIZE.w - exit_area.w,
+				BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 4 / 3 + REAL_MAP_SIZE.h,
+				exit_area.w, exit_area.h});
+		exit.set_on_click([this](UCoord) {
+			request_stop = true;
+		});
+		button_manager->add_button(std::move(exit));
+
+
 
 		SDL_Surface *sur = SDL_CreateRGBSurface(0, CHESSMAN_AREA.w, CHESSMAN_AREA.h, 32,
 				0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF);
@@ -688,7 +759,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	}
 
 	void Game::start() {
-		while(true) {
+		while(!request_stop) {
 			SDL_SetRenderDrawColor(render, BACKGROUND_COLOR.r, BACKGROUND_COLOR.g, BACKGROUND_COLOR.b, 255);
 			SDL_RenderCopy(render, background_texture, nullptr, nullptr);
 
@@ -752,9 +823,11 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				}
 			}
 
-			constexpr UCoord TEXT_POS = {BACKGROUND_BLANK_OUTOF_MAP_SIZE.w, BACKGROUND_BLANK_OUTOF_MAP_SIZE.h / 3};
+			constexpr uint_type TEXT_Y_POS = BACKGROUND_BLANK_OUTOF_MAP_SIZE.h / 3;
 			if(game.status() == CoreGame::Status::NONE) {
-				font->render_text(game.is_white_turn() ? "whites turn" : "blacks turn", TEXT_POS);
+				const char *prompt = game.is_white_turn() ? "whites turn" : "blacks turn";
+				const Area prompt_size = Font::text_size(prompt);
+				font->render_text(prompt, {WINDOW_SIZE.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
 			} else { //Some one won
 				std::pair<UCoord, UCoord> rows = {
 					chessman_coord_on_screen(game.get_rows().first),
@@ -762,7 +835,9 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				};
 				SDL_SetRenderDrawColor(render, 255, 100, 100, 255);
 				SDL_RenderDrawLine(render, rows.first.x, rows.first.y, rows.second.x, rows.second.y);
-				font->render_text(game.is_white_turn() ? "white won" : "black won", TEXT_POS);
+				const char *prompt = game.is_white_turn() ? "white won" : "black won";
+				const Area prompt_size = Font::text_size(prompt);
+				font->render_text(prompt, {WINDOW_SIZE.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
 			}
 
 
