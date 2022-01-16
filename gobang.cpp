@@ -1,16 +1,17 @@
-#include "argument_utils.h"
-#include <SDL2/SDL.h>
-#include <algorithm>
-#include <cassert>
-#include <cstdint>
-#include <cstring>
-#include <functional>
-#include <initializer_list>
-#include <string_view>
+#include <vector>
 #include <iostream>
+#include <functional>
+#include <string>
+#include <string_view>
+#include <initializer_list>
+
+#include <cstdint>
+#include <cassert>
+#include <cstring>
+
+#include <SDL2/SDL.h>
 
 #include <console.h>
-#include <sys/types.h>
 #define INCLUDE_ARGUMENT
 #include <utils.h>
 
