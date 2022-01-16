@@ -1,7 +1,3 @@
-#include "SDL2/SDL_blendmode.h"
-#include "SDL2/SDL_pixels.h"
-#include "SDL2/SDL_render.h"
-#include "SDL2/SDL_surface.h"
 #include "argument_utils.h"
 #include <SDL2/SDL.h>
 #include <algorithm>
