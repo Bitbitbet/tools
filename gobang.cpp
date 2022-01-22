@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <initializer_list>
+#include <thread>
 
 #include <cstdint>
 #include <cassert>
@@ -650,11 +651,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	 */
         class Game {
 	public:
-		static Game &instance() { //Make sure that there is only one instance of Game.
-			static Game g;
-			return g;
-		}
-
+		Game();
 		~Game();
 		Game(const Game &) = delete;
 		Game &operator=(const Game &) = delete;
@@ -675,7 +672,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		CoreGame game;
 
-		Game();
 	};
 
 	Game::Game() {
@@ -1001,17 +997,12 @@ namespace frontend_with_console {
 
 	class Game {
 	public:
-		static Game &instance() {
-			static Game g;
-			return g;
-		}
-
+		Game();
 		~Game() = default;
 
 		void start();
 
 	private:
-		Game();
 
 		CoreGame game, bufgame;
 		UCoord selection_pos, buf_selection_pos;
@@ -1160,8 +1151,8 @@ namespace frontend_with_console {
 
 
 enum class Mode {
-	console, graphic
-} mode = Mode::graphic;
+	console, graphic, all
+} mode = Mode::all;
 
 /*
  * Process command line.
@@ -1182,12 +1173,14 @@ int process_argument(size_t argc, char **argv) {
 
 	switch_mode.add_name("-m").add_name("--mode");
 	switch_mode.set_argc(1);
-	switch_mode.set_description("Set the display mode of gobang. Possible option: console, graphic.");
-	switch_mode.set_act_func([] (char **argv) {
-		if(strcmp(argv[0], "console") == 0) {
+	switch_mode.set_description("Set the display mode of gobang. Possible option: console, graphic, all.");
+	switch_mode.set_act_func([argv] (char **argvv) {
+		if(strcmp(argvv[0], "console") == 0) {
 			mode = Mode::console;
-		} else if(strcmp(argv[0], "graphic") == 0) {
+		} else if(strcmp(argvv[0], "graphic") == 0) {
 			mode = Mode::graphic;
+		} else if(strcmp(argvv[0], "all") == 0) {
+			mode = Mode::all;
 		} else {
 			log_error("Type \"%s --help\" for usage.", argv[0]);
 			exit(1);
@@ -1205,11 +1198,24 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	if(mode == Mode::console) {
-		auto &g = frontend_with_console::Game::instance();
+		frontend_with_console::Game g;
 		g.start();
 	} else if(mode == Mode::graphic) {
-		auto &g = frontend_with_SDL2::Game::instance();
+		frontend_with_SDL2::Game g;
 		g.start();
+	} else if(mode == Mode::all) {
+		auto console_func = []() {
+			frontend_with_console::Game g;
+			g.start();
+		};
+		std::thread console_thread(console_func);
+
+		{
+			frontend_with_SDL2::Game g;
+			g.start();
+		}
+
+		console_thread.join();
 	}
 	return 0;
 }
