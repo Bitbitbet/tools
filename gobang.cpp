@@ -1,4 +1,3 @@
-#include <SDL2/SDL_render.h>
 #include <vector>
 #include <iostream>
 #include <functional>
