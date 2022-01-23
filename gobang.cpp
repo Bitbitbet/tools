@@ -1,3 +1,4 @@
+#include <SDL2/SDL_video.h>
 #include <vector>
 #include <iostream>
 #include <functional>
@@ -31,6 +32,17 @@ using std::string_view;
 
 constexpr struct Area MAP_SIZE = {15, 15};
 constexpr uint_type AMOUNT_OF_ROWS = 5; // amount of chessmen required in a row to win
+
+
+// User specified through command line.
+enum class Mode {
+	console, graphic, all
+} mode = Mode::all;
+
+bool software_rendering = false;
+
+
+
 
 class CoreGame {
 public:
@@ -690,18 +702,28 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			log_error("Error occurred creating the main window: %s.", SDL_GetError());
 			exit(1);
 		}
-		render = SDL_CreateRenderer(window, -1,
-				SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-		if(!render) {
-			log_error("Warning: cannot create renderer with hardware acceleration: %s.", SDL_GetError());
-			render = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
+		SDL_Surface *screen;
+		if(software_rendering) {
+			screen = SDL_GetWindowSurface(window);
+			render = SDL_CreateSoftwareRenderer(screen);
 			if(!render) {
-				log_error("Can't create renderer.");
+				log_error("Can't create software renderer.");
 				exit(1);
+			}
+		} else {
+			render = SDL_CreateRenderer(window, -1,
+					SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+			screen = SDL_GetWindowSurface(window);
+			if(!render) {
+				log_error("Warning: cannot create renderer with hardware acceleration: %s.", SDL_GetError());
+				render = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
+				if(!render) {
+					log_error("Can't create renderer.");
+					exit(1);
+				}
 			}
 		}
 		SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
-		SDL_Surface *screen = SDL_GetWindowSurface(window);
 
 		SDL_Surface *background_surface = generate_background_surface(screen->format);
 		background_texture = SDL_CreateTextureFromSurface(render, background_surface);
@@ -865,7 +887,11 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
 			button_manager->draw(true, mouse_coord);
 
-			SDL_RenderPresent(render);
+			if(software_rendering) {
+				SDL_UpdateWindowSurface(window);
+			} else {
+				SDL_RenderPresent(render);
+			}
 			SDL_Delay(10);
 		}
 	}
@@ -1149,11 +1175,6 @@ namespace frontend_with_console {
 	}
 }
 
-
-enum class Mode {
-	console, graphic, all
-} mode = Mode::all;
-
 /*
  * Process command line.
  * Return: 0 for success, a non-zero integer for failures.
@@ -1161,7 +1182,7 @@ enum class Mode {
 int process_argument(size_t argc, char **argv) {
 	ArgumentProcessor ap;
 
-	Argument help, switch_mode;
+	Argument help, switch_mode, enable_software_rendering;
 
 	help.add_name("-h").add_name("--help").add_name("--usage");
 	help.set_argc(0);
@@ -1187,8 +1208,16 @@ int process_argument(size_t argc, char **argv) {
 		}
 	});
 
+	enable_software_rendering.add_name("--enable-software-rendering");
+	enable_software_rendering.set_argc(0);
+	enable_software_rendering.set_description("Enable software rendering. Available in graphic(all) mode.");
+	enable_software_rendering.set_act_func([] (char **) {
+		software_rendering = true;
+	});
+
 	ap.register_argument(help);
 	ap.register_argument(switch_mode);
+	ap.register_argument(enable_software_rendering);
 
 	return ap.process(argc, argv) ? 0 : 1;
 }
