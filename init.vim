@@ -254,6 +254,8 @@ syntax off
 exec "nohlsearch"
 au BufRead,BufNewFile .zshrc set filetype=sh
 
+au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
+
 
 
 exe 'source ~/.config/nvim/custom.vim'
