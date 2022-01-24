@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cassert>
 #include <cstring>
+#include <cstdlib>
 
 #include <SDL2/SDL.h>
 
@@ -29,11 +30,13 @@ using console::screen_clear;
 
 using std::string_view;
 
-constexpr struct Area MAP_SIZE = {15, 15};
-constexpr uint_type AMOUNT_OF_ROWS = 5; // amount of chessmen required in a row to win
+constexpr Area DEFAULT_MAP_SIZE = {15, 15};
+constexpr uint_type DEFAULT_AMOUNT_OF_ROWS = 5;
+
+Area map_size = DEFAULT_MAP_SIZE;
+uint_type amount_of_rows = DEFAULT_AMOUNT_OF_ROWS; // amount of chessmen required in a row to win
 
 
-// User specified through command line.
 enum class Mode {
 	console, graphic, all
 } mode = Mode::all;
@@ -52,8 +55,28 @@ public:
 		NONE, WHITE_WON, BLACK_WON
 	};
 
-	CoreGame() {clear();}
-	~CoreGame() = default;
+	CoreGame() {
+		map = new Unit[map_size.w * map_size.h];
+		clear();
+	}
+	CoreGame(const CoreGame &c) :
+		rows(c.rows),
+		m_is_white_turn(c.m_is_white_turn),
+		m_status(c.m_status)
+
+	{
+		map = new Unit[map_size.w * map_size.h];
+		memcpy(map, c.map, map_size.w * map_size.h * sizeof(Unit));
+	}
+	~CoreGame() {delete[] map;}
+
+	CoreGame &operator=(const CoreGame &c) {
+		rows = c.rows;
+		m_is_white_turn = c.m_is_white_turn;
+		m_status = c.m_status;
+		memcpy(map, c.map, map_size.w * map_size.h * sizeof(Unit));
+		return *this;
+	}
 
 	/* 
 	 * ----------------
@@ -105,19 +128,15 @@ public:
 private:
 
 	Unit &get(UCoord c) {
-		// assert(c.x < MAP_SIZE.w && c.y < MAP_SIZE.h);
-		if(c.x >= MAP_SIZE.w || c.y >= MAP_SIZE.h) {
-			log_error("{%d, %d}", (int)c.x, (int)c.y);
-			exit(1);
-		}
-		return map[c.x * MAP_SIZE.w + c.y];
+		assert(c.x < map_size.w && c.y < map_size.h);
+		return map[c.x * map_size.w + c.y];
 	}
 	const Unit &get(UCoord c) const {
-		assert(c.x < MAP_SIZE.w && c.y < MAP_SIZE.h);
-		return map[c.x * MAP_SIZE.w + c.y];
+		assert(c.x < map_size.w && c.y < map_size.h);
+		return map[c.x * map_size.w + c.y];
 	}
 
-	Unit map[MAP_SIZE.w * MAP_SIZE.h];
+	Unit *map;
 	std::pair<UCoord, UCoord> rows; /* Contains the start coord and the end coord
 			of a row that is long enough to win. */
 	bool m_is_white_turn;
@@ -125,7 +144,7 @@ private:
 };
 
 void CoreGame::clear() {
-	memset(map, static_cast<int>(Unit::EMPTY), sizeof(map));
+	memset(map, static_cast<int>(Unit::EMPTY), map_size.w * map_size.h * sizeof(Unit));
 	rows = {{0, 0}, {0, 0}};
 	m_is_white_turn = true;
 	m_status = Status::NONE;
@@ -139,13 +158,13 @@ void CoreGame::place(UCoord c) {
 	UCoord start;
 	UCoord iter = {0, c.y}; //Search in direction: -
 	uint_type row_count = 0;
-	for(; iter.x < MAP_SIZE.w; ++iter.x) {
+	for(; iter.x < map_size.w; ++iter.x) {
 		if(get(iter) == get(c)) {
 			if(row_count == 0) {
 				start = iter;
 			}
 			++row_count;
-			if(row_count == AMOUNT_OF_ROWS) { // someone won
+			if(row_count == amount_of_rows) { // someone won
 				rows.first = start;
 				rows.second = iter;
 				m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
@@ -157,13 +176,13 @@ void CoreGame::place(UCoord c) {
 	}
 	iter = c.x > c.y ? UCoord{c.x - c.y, 0} : UCoord{0, c.y - c.x}; // Search in direction: '\'
 	row_count = 0;
-	for(; iter.x < MAP_SIZE.w && iter.y < MAP_SIZE.h; ++iter.x, ++iter.y) {
+	for(; iter.x < map_size.w && iter.y < map_size.h; ++iter.x, ++iter.y) {
 		if(get(iter) == get(c)) {
 			if(row_count == 0) {
 				start = iter;
 			}
 			++row_count;
-			if(row_count == AMOUNT_OF_ROWS) { // someone won
+			if(row_count == amount_of_rows) { // someone won
 				rows.first = start;
 				rows.second = iter;
 				m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
@@ -175,13 +194,13 @@ void CoreGame::place(UCoord c) {
 	}
 	iter = {c.x, 0}; // Search in direction: |
 	row_count = 0;
-	for(; iter.y < MAP_SIZE.h; ++iter.y) {
+	for(; iter.y < map_size.h; ++iter.y) {
 		if(get(iter) == get(c)) {
 			if(row_count == 0) {
 				start = iter;
 			}
 			++row_count;
-			if(row_count == AMOUNT_OF_ROWS) { // someone won
+			if(row_count == amount_of_rows) { // someone won
 				rows.first = start;
 				rows.second = iter;
 				m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
@@ -191,15 +210,15 @@ void CoreGame::place(UCoord c) {
 			row_count = 0;
 		}
 	}
-	iter = (MAP_SIZE.w - 1 - c.x) > c.y ? UCoord{c.x + c.y, 0} : UCoord{MAP_SIZE.w - 1, c.y - (MAP_SIZE.w - 1 - c.x)};
+	iter = (map_size.w - 1 - c.x) > c.y ? UCoord{c.x + c.y, 0} : UCoord{map_size.w - 1, c.y - (map_size.w - 1 - c.x)};
 	row_count = 0; // Search in direction: /
-	for(; iter.x < MAP_SIZE.w && iter.y < MAP_SIZE.h; --iter.x, ++iter.y) {
+	for(; iter.x < map_size.w && iter.y < map_size.h; --iter.x, ++iter.y) {
 			if(get(iter) == get(c)) {
 				if(row_count == 0) {
 					start = iter;
 				}
 				++row_count;
-				if(row_count == AMOUNT_OF_ROWS) { // someone won
+				if(row_count == amount_of_rows) { // someone won
 					rows.first = start;
 					rows.second = iter;
 					m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
@@ -223,24 +242,30 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	constexpr Area BACKGROUND_BLANK_BETWEEN_LINES_SIZE = {30, 30};
 	constexpr uint_type BACKGROUND_BORDER_WIDTH = 6;
 	constexpr Area BACKGROUND_BLANK_OUTOF_MAP_SIZE = {20, 60};
-	constexpr Area INNER_MAP_SIZE = {BACKGROUND_LINE_WIDTH * 15 + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w * 16,
-			BACKGROUND_LINE_WIDTH * 15 + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h * 16};
-	constexpr Area REAL_MAP_SIZE = {INNER_MAP_SIZE.w + BACKGROUND_BORDER_WIDTH * 2,
-			INNER_MAP_SIZE.h + BACKGROUND_BORDER_WIDTH * 2};
 
-	constexpr Area WINDOW_SIZE = {
-		BACKGROUND_LINE_WIDTH * MAP_SIZE.w + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w *
-			(MAP_SIZE.w + 1) +
-			BACKGROUND_BORDER_WIDTH * 2 + BACKGROUND_BLANK_OUTOF_MAP_SIZE.w * 2,
-		BACKGROUND_LINE_WIDTH * MAP_SIZE.h + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h *
-			(MAP_SIZE.h + 1) +
-			BACKGROUND_BORDER_WIDTH * 2 + BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 2};
+	Area inner_map_size;
+	Area real_map_size;
+	Area window_size;
+	void calculate() {
+		window_size =  {
+			BACKGROUND_LINE_WIDTH * map_size.w + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w *
+				(map_size.w + 1) +
+				BACKGROUND_BORDER_WIDTH * 2 + BACKGROUND_BLANK_OUTOF_MAP_SIZE.w * 2,
+			BACKGROUND_LINE_WIDTH * map_size.h + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h *
+				(map_size.h + 1) +
+				BACKGROUND_BORDER_WIDTH * 2 + BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 2
+		};
+		inner_map_size = {BACKGROUND_LINE_WIDTH * map_size.w + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w * (map_size.w + 1),
+				BACKGROUND_LINE_WIDTH * map_size.h + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h * (map_size.h + 1)};
+		real_map_size = {inner_map_size.w + BACKGROUND_BORDER_WIDTH * 2,
+				inner_map_size.h + BACKGROUND_BORDER_WIDTH * 2};
+	}
 
 	/*
 	 * Calculate the actual coord of chessman on the screen, according to the coord of chessman on the map.
 	 */
 	UCoord chessman_coord_on_screen(UCoord coord) {
-		assert(coord.x < MAP_SIZE.w && coord.y < MAP_SIZE.h);
+		assert(coord.x < map_size.w && coord.y < map_size.h);
 		return {
 			BACKGROUND_BLANK_OUTOF_MAP_SIZE.w + BACKGROUND_BORDER_WIDTH + (coord.x + 1) *
 				BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + coord.x * BACKGROUND_LINE_WIDTH + BACKGROUND_LINE_WIDTH / 2,
@@ -256,7 +281,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	 * Calculate the actual rectangle the chessman occupied on the screen.
 	 */
 	SDL_Rect chessman_rect_on_screen(UCoord coord) {
-		assert(coord.x < MAP_SIZE.w && coord.y < MAP_SIZE.h);
+		assert(coord.x < map_size.w && coord.y < map_size.h);
 		const UCoord central_point = chessman_coord_on_screen(coord);
 		return {
 			static_cast<int>(central_point.x - CHESSMAN_AREA.w / 2),
@@ -308,15 +333,17 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		const auto black_color = SDL_MapRGB(format, 50, 50, 50);
 
 
-		SDL_Surface *background_surface = SDL_CreateRGBSurfaceWithFormat(0, WINDOW_SIZE.w, WINDOW_SIZE.h, 0, format->format);
-		SDL_Rect r = {0, 0, WINDOW_SIZE.w, WINDOW_SIZE.h};
+		SDL_Surface *background_surface = SDL_CreateRGBSurfaceWithFormat(0, window_size.w, window_size.h, 0, format->format);
+		SDL_Rect r = {0, 0, static_cast<int>(window_size.w), static_cast<int>(window_size.h)};
 		SDL_FillRect(background_surface, &r, background_color);
 	
-		r = {BACKGROUND_BLANK_OUTOF_MAP_SIZE.w, BACKGROUND_BLANK_OUTOF_MAP_SIZE.h,
-			REAL_MAP_SIZE.w, REAL_MAP_SIZE.h};
+		r.x = BACKGROUND_BLANK_OUTOF_MAP_SIZE.w;
+		r.y = BACKGROUND_BLANK_OUTOF_MAP_SIZE.h;
+		r.w = real_map_size.w;
+		r.h = real_map_size.h;
 		SDL_FillRect(background_surface, &r, black_color);
-		for(size_t x = 0; x < MAP_SIZE.w + 1; ++x) {
-			for(size_t y = 0; y < MAP_SIZE.h + 1; ++y) {
+		for(size_t x = 0; x < map_size.w + 1; ++x) {
+			for(size_t y = 0; y < map_size.h + 1; ++y) {
 				r = {
 					static_cast<int>(BACKGROUND_BLANK_OUTOF_MAP_SIZE.w + BACKGROUND_BORDER_WIDTH + x *
 					(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH)),
@@ -327,14 +354,16 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				SDL_FillRect(background_surface, &r, background_color);
 			}
 		}
-		UCoord coords[4] = {
-			chessman_coord_on_screen({2, 2}),
-			chessman_coord_on_screen({MAP_SIZE.w - 3, 2}),
-			chessman_coord_on_screen({2, MAP_SIZE.h - 3}),
-			chessman_coord_on_screen({MAP_SIZE.w - 3, MAP_SIZE.h - 3}),
-		};
-		for(UCoord coord : coords) {
-			filledCircleRGBA(background_surface, coord.x, coord.y, BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w / 10, black_color);
+		if(map_size.w > 2 && map_size.h > 2) {
+			UCoord coords[4] = {
+				chessman_coord_on_screen({2, 2}),
+				chessman_coord_on_screen({map_size.w - 3, 2}),
+				chessman_coord_on_screen({2, map_size.h - 3}),
+				chessman_coord_on_screen({map_size.w - 3, map_size.h - 3}),
+			};
+			for(UCoord coord : coords) {
+				filledCircleRGBA(background_surface, coord.x, coord.y, BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w / 10, black_color);
+			}
 		}
 		return background_surface;
 	}
@@ -404,8 +433,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		constexpr static Area FONT_CHARACTER_SIZE = {14, 14};
 		constexpr static size_t SCALE_TIME = 2;
-		constexpr static Area DEFAULT_EXTRA_ADVANCE = {SCALE_TIME, SCALE_TIME};
 
+		constexpr static Area DEFAULT_EXTRA_ADVANCE = {SCALE_TIME, SCALE_TIME};
 	public:
 		constexpr static size_t CHARACTER_COUNT = '~' - '!' - 26 + 1;
 		constexpr static Area CHARACTER_SIZE = {FONT_CHARACTER_SIZE.w * SCALE_TIME, FONT_CHARACTER_SIZE.h * SCALE_TIME};
@@ -694,8 +723,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		}
 		window = SDL_CreateWindow("Gobang", SDL_WINDOWPOS_UNDEFINED,
 					SDL_WINDOWPOS_UNDEFINED,
-					WINDOW_SIZE.w,
-					WINDOW_SIZE.h,
+					window_size.w,
+					window_size.h,
 					SDL_WINDOW_SHOWN);
 		if(!window) {
 			log_error("Error occurred creating the main window: %s.", SDL_GetError());
@@ -735,7 +764,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		constexpr Area reset_area = Font::text_size("reset");
 		Button reset("reset", {BACKGROUND_BLANK_OUTOF_MAP_SIZE.w,
-				BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 4 / 3 + REAL_MAP_SIZE.h,
+				static_cast<int>(BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 4 / 3 + real_map_size.h),
 				reset_area.w, reset_area.h});
 		reset.set_on_click([this] (UCoord) {
 			game.clear();
@@ -743,8 +772,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		button_manager->add_button(std::move(reset));
 
 		constexpr Area exit_area = Font::text_size("exit");
-		Button exit("exit", {WINDOW_SIZE.w - BACKGROUND_BLANK_OUTOF_MAP_SIZE.w - exit_area.w,
-				BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 4 / 3 + REAL_MAP_SIZE.h,
+		Button exit("exit", {static_cast<int>(window_size.w - BACKGROUND_BLANK_OUTOF_MAP_SIZE.w - exit_area.w),
+				static_cast<int>(BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 4 / 3 + real_map_size.h),
 				exit_area.w, exit_area.h});
 		exit.set_on_click([this](UCoord) {
 			request_stop = true;
@@ -827,8 +856,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 			bool selected_chessman = false;
 			UCoord selected_chessman_coord;
-			for(uint_type y = 0; y < MAP_SIZE.h; ++y) {
-				for(uint_type x = 0; x < MAP_SIZE.w; ++x) {
+			for(uint_type y = 0; y < map_size.h; ++y) {
+				for(uint_type x = 0; x < map_size.w; ++x) {
 					CoreGame::Unit unit = game[{x, y}];
 					SDL_Rect chessman_rect = chessman_rect_on_screen({x, y});
 					// SDL_SetRenderDrawColor(render, 0, 0, 255, 255);
@@ -869,7 +898,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			if(game.status() == CoreGame::Status::NONE) {
 				const char *prompt = game.is_white_turn() ? "white's turn" : "black's turn";
 				const Area prompt_size = Font::text_size(prompt);
-				font->render_text(prompt, {WINDOW_SIZE.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
+				font->render_text(prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
 			} else { //Some one won
 				std::pair<UCoord, UCoord> rows = {
 					chessman_coord_on_screen(game.get_rows().first),
@@ -879,7 +908,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				SDL_RenderDrawLine(render, rows.first.x, rows.first.y, rows.second.x, rows.second.y);
 				const char *prompt = game.is_white_turn() ? "white won!" : "black won!";
 				const Area prompt_size = Font::text_size(prompt);
-				font->render_text(prompt, {WINDOW_SIZE.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
+				font->render_text(prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
 			}
 
 
@@ -891,7 +920,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			} else {
 				SDL_RenderPresent(render);
 			}
-			SDL_Delay(10);
+			SDL_Delay(1);
 		}
 	}
 }
@@ -927,12 +956,12 @@ namespace frontend_with_console {
 	 */
 	void print(const CoreGame &g) {
 		putchar('|');
-		for(uint_type i = 0; i < MAP_SIZE.w * 2; ++i) putchar('-');
+		for(uint_type i = 0; i < map_size.w * 2; ++i) putchar('-');
 		putchar('|');
 		putchar('\n');
-		for(uint_type y = 0; y < MAP_SIZE.h; ++y) {
+		for(uint_type y = 0; y < map_size.h; ++y) {
 			putchar('|');
-			for(uint_type x = 0; x < MAP_SIZE.w; ++x) {
+			for(uint_type x = 0; x < map_size.w; ++x) {
 				ColorEnum color;
 				switch(g[{x, y}]) {
 					case CoreGame::Unit::EMPTY:
@@ -949,13 +978,13 @@ namespace frontend_with_console {
 				}
 				if(x == 0 || g[{x - 1, y}] != g[{x, y}]) background_color(color);
 				printf("  ");
-				if(x == MAP_SIZE.w - 1 || g[{x, y}] != g[{x + 1, y}]) color_reset();
+				if(x == map_size.w - 1 || g[{x, y}] != g[{x + 1, y}]) color_reset();
 			}
 			putchar('|');
 			putchar('\n');
 		}
 		putchar('|');
-		for(uint_type i = 0; i < MAP_SIZE.w * 2; ++i) putchar('-');
+		for(uint_type i = 0; i < map_size.w * 2; ++i) putchar('-');
 		putchar('|');
 		putchar('\n');
 	}
@@ -965,8 +994,8 @@ namespace frontend_with_console {
 	 * The position of cursor is set to {0, MAP_SIZE.h + 2} after a call completes.
 	 */
 	void print_diff(const CoreGame &game, const CoreGame &bufgame) {
-		for(uint_type x = 0; x < MAP_SIZE.w; ++x) {
-			for(uint_type y = 0; y < MAP_SIZE.h; ++y) {
+		for(uint_type x = 0; x < map_size.w; ++x) {
+			for(uint_type y = 0; y < map_size.h; ++y) {
 				if(game[{x, y}] != bufgame[{x, y}]) {
 					ColorEnum color;
 					switch(game[{x, y}]) {
@@ -989,7 +1018,7 @@ namespace frontend_with_console {
 				}
 			}
 		}
-		cursor_gotoxy({0, MAP_SIZE.h + 2});
+		cursor_gotoxy({0, map_size.h + 2});
 	}
 
 	/*
@@ -997,9 +1026,9 @@ namespace frontend_with_console {
 	 * The position of cursor is set to {0, MAP_SIZE.h + 2} after a call completes.
 	 */
 	void print_selection(const CoreGame &game, UCoord selection_pos, bool has_old_selection_pos = false, UCoord old_selection_pos = {0, 0}) {
-		assert(selection_pos.x < MAP_SIZE.w || selection_pos.y < MAP_SIZE.h);
+		assert(selection_pos.x < map_size.w || selection_pos.y < map_size.h);
 		if(game[selection_pos] != CoreGame::Unit::EMPTY) {
-			cursor_gotoxy({0, MAP_SIZE.h + 2});
+			cursor_gotoxy({0, map_size.h + 2});
 			return;
 		};
 
@@ -1016,7 +1045,7 @@ namespace frontend_with_console {
 		background_color(SELECTION_COLOR);
 		printf("  ");
 		color_reset();
-		cursor_gotoxy({0, MAP_SIZE.h + 2});
+		cursor_gotoxy({0, map_size.h + 2});
 	}
 
 
@@ -1034,7 +1063,7 @@ namespace frontend_with_console {
 	};
 
 	Game::Game() {
-		selection_pos = {MAP_SIZE.w / 2, MAP_SIZE.h / 2};
+		selection_pos = {map_size.w / 2, map_size.h / 2};
 		buf_selection_pos = selection_pos;
 	}
 
@@ -1082,10 +1111,10 @@ namespace frontend_with_console {
 				bool reset_success = false;
 				UCoord iter = {selection_pos.x + 1, selection_pos.y};
 				while(iter != selection_pos) {
-					if(iter.x == MAP_SIZE.w) {
+					if(iter.x == map_size.w) {
 						iter.x = 0;
 						++iter.y;
-						if(iter.y == MAP_SIZE.h) {
+						if(iter.y == map_size.h) {
 							iter.y = 0;
 						}
 					}
@@ -1102,10 +1131,10 @@ namespace frontend_with_console {
 			} else {
 				UCoord new_selection_pos = selection_pos;
 				auto inboard = [](UCoord c) -> bool {
-					return c.x < MAP_SIZE.w && c.y < MAP_SIZE.h;
+					return c.x < map_size.w && c.y < map_size.h;
 				};
 				auto available = [this](UCoord c) -> bool {
-					return c.x < MAP_SIZE.w && c.y < MAP_SIZE.h && game[c] == CoreGame::Unit::EMPTY;
+					return c.x < map_size.w && c.y < map_size.h && game[c] == CoreGame::Unit::EMPTY;
 				};
 				if(key == Key::LEFT) {
 					bool move_success = true;
@@ -1181,7 +1210,7 @@ namespace frontend_with_console {
 int process_argument(size_t argc, char **argv) {
 	ArgumentProcessor ap;
 
-	Argument help, switch_mode, enable_software_rendering;
+	Argument help, map_size_arg, rows, switch_mode, enable_software_rendering;
 
 	help.add_name("-h").add_name("--help").add_name("--usage");
 	help.set_argc(0);
@@ -1189,6 +1218,58 @@ int process_argument(size_t argc, char **argv) {
 	help.set_act_func([&ap](char **argv) {
 		ap.output_help({argv[0], ": Gobang, can either run with SDL2 or in terminal.\nRun in terminal in default.\nConsole mode: WASDQR<Enter><Space>"});
 		exit(0);
+	});
+
+	map_size_arg.add_name("-s").add_name("--map-size");
+	map_size_arg.set_argc(2);
+	map_size_arg.set_description("Specify the size of map.");
+	map_size_arg.set_act_func([](char **argv) {
+		bool success;
+		int i = parse_int(argv[0], &success);
+
+		if(!success) {
+			log_error("Require an integer(\"%s\").", argv[0]);
+			exit(1);
+		}
+		if(i <= 0) {
+			log_error("Require an integer greater than 0(\"%d\").", i);
+			exit(1);
+		}
+		map_size.w = i;
+
+		i = parse_int(argv[1], &success);
+		if(!success) {
+			log_error("Require an integer(\"%s\").", argv[0]);
+			exit(1);
+		}
+		if(i <= 0) {
+			log_error("Require an integer greater than 0(\"%d\").", i);
+			exit(1);
+		}
+		map_size.h = i;
+
+		int limit = map_size.w < map_size.h ? map_size.h : map_size.w;
+		if(amount_of_rows > limit) amount_of_rows = limit;
+	});
+
+	rows.add_name("-a").add_name("--amount");
+	rows.set_argc(1);
+	rows.set_description("Specify the amount of chessman in a rows that is enough to win.");
+	rows.set_act_func([](char **argv) {
+		bool success;
+		int i = parse_int(argv[0], &success);
+
+		if(!success) {
+			log_error("Require an integer(\"%s\").", argv[0]);
+			exit(1);
+		}
+
+		const int long_limit = map_size.w < map_size.h ? map_size.h : map_size.w;
+		if(i <= 0 || i > long_limit) {
+			log_error("Require an integer from 1 to %d(\"%d\").", long_limit, i);
+			exit(1);
+		}
+		amount_of_rows = i;
 	});
 
 	switch_mode.add_name("-m").add_name("--mode");
@@ -1215,6 +1296,8 @@ int process_argument(size_t argc, char **argv) {
 	});
 
 	ap.register_argument(help);
+	ap.register_argument(map_size_arg);
+	ap.register_argument(rows);
 	ap.register_argument(switch_mode);
 	ap.register_argument(enable_software_rendering);
 
@@ -1229,6 +1312,7 @@ int main(int argc, char **argv) {
 		frontend_with_console::Game g;
 		g.start();
 	} else if(mode == Mode::graphic) {
+		frontend_with_SDL2::calculate();
 		frontend_with_SDL2::Game g;
 		g.start();
 	} else if(mode == Mode::all) {
@@ -1239,6 +1323,7 @@ int main(int argc, char **argv) {
 		std::thread console_thread(console_func);
 
 		{
+			frontend_with_SDL2::calculate();
 			frontend_with_SDL2::Game g;
 			g.start();
 		}

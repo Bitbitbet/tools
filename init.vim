@@ -1,3 +1,29 @@
+" --------------vimspector settings--------------
+map <F3> <Plug>VimspectorStop
+map <F4> <Plug>VimspectorRestart
+map <F5> <Plug>VimspectorContinue
+map <F6> <Plug>VimspectorPause
+map <F7> <Plug>VimspectorBalloonEval
+map <F8> <Plug>VimspectorAddFunctionBreakpoint
+map <F9> <Plug>VimspectorToggleBreakpoint
+map <LEADER><F9> <Plug>VimspectorToggleConditionalBreakpoint
+map <F10> <Plug>VimspectorStepOver
+map <LEADER><F10> <Plug>VimspectorStepInto
+map <F12> <Plug>VimspectorStepout
+" F3: stop
+" F4: restart
+" F5: start or continue
+" F6: pause
+" F7: Balloon Eval
+" F8 F9 <LEADER>F9: Breakpoint 
+" F10: Step over
+" <LEADER>F10: Step into
+" F12: Step out of
+
+map <silent> <LEADER><F3> :VimspectorReset<CR>
+
+
+" --------------loading plugins--------------
 call plug#begin('~/.config/nvim/plug')
 
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
@@ -7,6 +33,7 @@ Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
 Plug 'ajmwagar/vim-deus'
 Plug 'Yggdroot/indentLine'
+Plug 'puremourning/vimspector'
 
 call plug#end()
 
@@ -81,7 +108,7 @@ function! s:show_documentation()
 endfunction
 
 " shortcut for coc#float#jump()
-nnoremap <silent> <LEADER>jp :call coc#float#jump()<CR>
+nnoremap <silent> <LEADER>p :call coc#float#jump()<CR>
 
 " better selection
 xmap if <Plug>(coc-funcobj-i)
@@ -211,8 +238,8 @@ colorscheme deus
 
 " --------------nvim settings--------------
 " Enable to move a line in normal mode
-noremap <C-k> ddkP
-noremap <C-j> ddp
+noremap <silent> <C-k> ddkP
+noremap <silent> <C-j> ddp
 " inoremap ( ()
 " inoremap [ []
 " inoremap { {}
