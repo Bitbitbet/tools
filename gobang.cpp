@@ -129,11 +129,11 @@ private:
 
 	Unit &get(UCoord c) {
 		assert(c.x < map_size.w && c.y < map_size.h);
-		return map[c.x * map_size.w + c.y];
+		return map[c.y * map_size.w + c.x];
 	}
 	const Unit &get(UCoord c) const {
 		assert(c.x < map_size.w && c.y < map_size.h);
-		return map[c.x * map_size.w + c.y];
+		return map[c.y * map_size.w + c.x];
 	}
 
 	Unit *map;
@@ -241,24 +241,25 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	constexpr uint_type BACKGROUND_LINE_WIDTH = 3;
 	constexpr Area BACKGROUND_BLANK_BETWEEN_LINES_SIZE = {30, 30};
 	constexpr uint_type BACKGROUND_BORDER_WIDTH = 6;
-	constexpr Area BACKGROUND_BLANK_OUTOF_MAP_SIZE = {20, 60};
-
+	constexpr Area DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE = {20, 60};
+	Area background_blank_outof_map_size = DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE;
+	constexpr uint_type MINIMUM_WINDOW_WIDTH = 400;
+	
 	Area inner_map_size;
 	Area real_map_size;
 	Area window_size;
 	void calculate() {
-		window_size =  {
-			BACKGROUND_LINE_WIDTH * map_size.w + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w *
-				(map_size.w + 1) +
-				BACKGROUND_BORDER_WIDTH * 2 + BACKGROUND_BLANK_OUTOF_MAP_SIZE.w * 2,
-			BACKGROUND_LINE_WIDTH * map_size.h + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h *
-				(map_size.h + 1) +
-				BACKGROUND_BORDER_WIDTH * 2 + BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 2
-		};
 		inner_map_size = {BACKGROUND_LINE_WIDTH * map_size.w + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w * (map_size.w + 1),
 				BACKGROUND_LINE_WIDTH * map_size.h + BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h * (map_size.h + 1)};
 		real_map_size = {inner_map_size.w + BACKGROUND_BORDER_WIDTH * 2,
 				inner_map_size.h + BACKGROUND_BORDER_WIDTH * 2};
+		if(real_map_size.w + background_blank_outof_map_size.w * 2 < MINIMUM_WINDOW_WIDTH) {
+			background_blank_outof_map_size.w = (MINIMUM_WINDOW_WIDTH - real_map_size.w) / 2;
+		}
+		window_size = {
+			real_map_size.w + background_blank_outof_map_size.w * 2,
+			real_map_size.h + background_blank_outof_map_size.h * 2
+		};
 	}
 
 	/*
@@ -267,9 +268,9 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	UCoord chessman_coord_on_screen(UCoord coord) {
 		assert(coord.x < map_size.w && coord.y < map_size.h);
 		return {
-			BACKGROUND_BLANK_OUTOF_MAP_SIZE.w + BACKGROUND_BORDER_WIDTH + (coord.x + 1) *
+			background_blank_outof_map_size.w + BACKGROUND_BORDER_WIDTH + (coord.x + 1) *
 				BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + coord.x * BACKGROUND_LINE_WIDTH + BACKGROUND_LINE_WIDTH / 2,
-			BACKGROUND_BLANK_OUTOF_MAP_SIZE.h + BACKGROUND_BORDER_WIDTH + (coord.y + 1) *
+			background_blank_outof_map_size.h + BACKGROUND_BORDER_WIDTH + (coord.y + 1) *
 				BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + coord.y * BACKGROUND_LINE_WIDTH + BACKGROUND_LINE_WIDTH / 2
 		};
 	}
@@ -337,17 +338,17 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		SDL_Rect r = {0, 0, static_cast<int>(window_size.w), static_cast<int>(window_size.h)};
 		SDL_FillRect(background_surface, &r, background_color);
 	
-		r.x = BACKGROUND_BLANK_OUTOF_MAP_SIZE.w;
-		r.y = BACKGROUND_BLANK_OUTOF_MAP_SIZE.h;
+		r.x = background_blank_outof_map_size.w;
+		r.y = background_blank_outof_map_size.h;
 		r.w = real_map_size.w;
 		r.h = real_map_size.h;
 		SDL_FillRect(background_surface, &r, black_color);
 		for(size_t x = 0; x < map_size.w + 1; ++x) {
 			for(size_t y = 0; y < map_size.h + 1; ++y) {
 				r = {
-					static_cast<int>(BACKGROUND_BLANK_OUTOF_MAP_SIZE.w + BACKGROUND_BORDER_WIDTH + x *
+					static_cast<int>(background_blank_outof_map_size.w + BACKGROUND_BORDER_WIDTH + x *
 					(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH)),
-					static_cast<int>(BACKGROUND_BLANK_OUTOF_MAP_SIZE.h + BACKGROUND_BORDER_WIDTH + y *
+					static_cast<int>(background_blank_outof_map_size.h + BACKGROUND_BORDER_WIDTH + y *
 					(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH)),
 					BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w, BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h
 				};
@@ -763,8 +764,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		button_manager = new ButtonManager(render, *font); // Buttons
 
 		constexpr Area reset_area = Font::text_size("reset");
-		Button reset("reset", {BACKGROUND_BLANK_OUTOF_MAP_SIZE.w,
-				static_cast<int>(BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 4 / 3 + real_map_size.h),
+		Button reset("reset", {static_cast<int>(DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w),
+				static_cast<int>(background_blank_outof_map_size.h * 4 / 3 + real_map_size.h),
 				reset_area.w, reset_area.h});
 		reset.set_on_click([this] (UCoord) {
 			game.clear();
@@ -772,8 +773,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		button_manager->add_button(std::move(reset));
 
 		constexpr Area exit_area = Font::text_size("exit");
-		Button exit("exit", {static_cast<int>(window_size.w - BACKGROUND_BLANK_OUTOF_MAP_SIZE.w - exit_area.w),
-				static_cast<int>(BACKGROUND_BLANK_OUTOF_MAP_SIZE.h * 4 / 3 + real_map_size.h),
+		Button exit("exit", {static_cast<int>(window_size.w - DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w - exit_area.w),
+				static_cast<int>(background_blank_outof_map_size.h * 4 / 3 + real_map_size.h),
 				exit_area.w, exit_area.h});
 		exit.set_on_click([this](UCoord) {
 			request_stop = true;
@@ -894,7 +895,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				}
 			}
 
-			constexpr uint_type TEXT_Y_POS = BACKGROUND_BLANK_OUTOF_MAP_SIZE.h / 3;
+			uint_type TEXT_Y_POS = background_blank_outof_map_size.h / 3;
 			if(game.status() == CoreGame::Status::NONE) {
 				const char *prompt = game.is_white_turn() ? "white's turn" : "black's turn";
 				const Area prompt_size = Font::text_size(prompt);
