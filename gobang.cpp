@@ -146,7 +146,7 @@ private:
 void CoreGame::clear() {
 	memset(map, static_cast<int>(Unit::EMPTY), map_size.w * map_size.h * sizeof(Unit));
 	rows = {{0, 0}, {0, 0}};
-	m_is_white_turn = true;
+	m_is_white_turn = false;
 	m_status = Status::NONE;
 }
 
