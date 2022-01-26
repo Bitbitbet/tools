@@ -1,3 +1,4 @@
+#include <memory>
 #include <vector>
 #include <iostream>
 #include <functional>
@@ -638,8 +639,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	public:
 		Widget();
 		Widget(URect r) : region(r) {}
-		Widget(const Widget &);
-		Widget(Widget &&);
+		virtual ~Widget() {}
 
 		/*
 		 * Should be called when a mouse click event occurs.
@@ -655,7 +655,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		void on_mouse_move_out() {on_mouse_move_out_function();}
 
-		void draw() {draw_function();}
+		void draw(bool mouse_hovering) {draw_function(mouse_hovering);}
 
 	protected:
 		URect region;
@@ -663,43 +663,62 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		virtual void on_click_function(UCoord) = 0;
 		virtual void on_mouse_move_on_function(UCoord) = 0;
 		virtual void on_mouse_move_out_function() = 0;
-		virtual void draw_function() = 0;
+		virtual void draw_function(bool mouse_hovering) = 0;
 	
 	};
 
 	class WidgetManager {
 	public:
-		WidgetManager() {}
+		WidgetManager() = default;
 
-		void register_widget(Widget widget) {
-			widgets.push_back(std::move(widget));
+		template<typename T>
+		void register_widget(T &&widget) {
+			widgets.emplace_back(widget);
 		}
 
-		void draw() {
-			for(Widget &widget: widgets) {
-				widget.draw();
-			}
-		}
+		void draw();
 
-		void mouse_button_down(UCoord mouse_coord);
+		bool mouse_button_down(UCoord mouse_coord);
 		void mouse_move(UCoord mouse_coord);
 	private:
 		struct WidgetNode {
-			Widget widget;
+			template<typename T>
+			WidgetNode(T &&widget_): widget(std::make_unique<T>(widget_)), mouse_hovering(false) {}
+
+			std::unique_ptr<Widget> widget;
 			bool mouse_hovering;
 		};
-		std::vector<Widget> widgets;
+		std::vector<WidgetNode> widgets;
 	};
 
-	void WidgetManager::mouse_button_down(UCoord c) {
-		for(Widget &widget: widgets) {
-			if(ucoord_in_rect(c, widget.region)) {
-				widget.on_click({c.x - widget.region.coord.x, c.y - widget.region.coord.y});
+	bool WidgetManager::mouse_button_down(UCoord c) {
+		for(WidgetNode &widget_node: widgets) {
+			if(ucoord_in_rect(c, widget_node.widget->region)) {
+				UCoord coord = widget_node.widget->region.coord;
+				widget_node.widget->on_click({c.x - coord.x, c.y - coord.y});
+				return true;
+			}
+		}
+		return false;
+	}
+	void WidgetManager::mouse_move(UCoord c) {
+		for(WidgetNode &widget_node: widgets) {
+			if(ucoord_in_rect(c, widget_node.widget->region)) {
+				widget_node.mouse_hovering = true;
+				UCoord coord = widget_node.widget->region.coord;
+				widget_node.widget->on_mouse_move_on({c.x - coord.x, c.y - coord.y});
+			} else {
+				if(widget_node.mouse_hovering) {
+					widget_node.mouse_hovering = false;
+					widget_node.widget->on_mouse_move_out();
+				}
 			}
 		}
 	}
-	void WidgetManager::mouse_move(UCoord c) {
-		;
+	void WidgetManager::draw() {
+		for(WidgetNode &widget_node: widgets) {
+			widget_node.widget->draw(widget_node.mouse_hovering);
+		}
 	}
 
 
@@ -731,15 +750,11 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			on_click_callback(c);
 		}
 
-		virtual void on_mouse_move_on_function(UCoord) override {
-			mouse_hovering = true;
-		}
+		virtual void on_mouse_move_on_function(UCoord) override {}
 
-		virtual void on_mouse_move_out_function() override {
-			mouse_hovering = false;
-		}
+		virtual void on_mouse_move_out_function() override {}
 
-		virtual void draw_function() override {
+		virtual void draw_function(bool mouse_hovering) override {
 			font.render_text(render, title, {
 				region.coord.x + region.area.w / 2 - Font::text_size(title).w / 2,
 				region.coord.y
@@ -760,8 +775,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	private:
 		std::string_view title;
 		std::function<on_click_callback_t> on_click_callback;
-
-		bool mouse_hovering;
 
 		SDL_Renderer *render;
 		const Font &font;
@@ -861,7 +874,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		exit.set_on_click([this](UCoord) {
 			request_stop = true;
 		});
-		button_manager->add_button(std::move(exit));
+		widget_manager.register_widget(exit);
 
 
 
@@ -900,7 +913,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 	Game::~Game() {
 		delete font;
-		delete button_manager;
 
 		SDL_DestroyTexture(black_chessman_texture);
 		SDL_DestroyTexture(black_chessman_transparent_texture);
@@ -969,7 +981,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 
 			if(mouse_down) {
-				if(!widget_manager.click_event(mouse_coord)) {
+				if(!widget_manager.mouse_button_down(mouse_coord)) {
 					if(game.status() == CoreGame::Status::NONE) {
 						if(selected_chessman && game[selected_chessman_coord] == CoreGame::Unit::EMPTY) {
 							game.place(selected_chessman_coord);
@@ -1332,7 +1344,7 @@ int process_argument(size_t argc, char **argv) {
 		}
 		map_size.h = i;
 
-		int limit = map_size.w < map_size.h ? map_size.h : map_size.w;
+		uint_type limit = map_size.w < map_size.h ? map_size.h : map_size.w;
 		if(amount_of_rows > limit) amount_of_rows = limit;
 	});
 
