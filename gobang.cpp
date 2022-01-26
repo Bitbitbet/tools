@@ -261,6 +261,27 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			real_map_size.h + background_blank_outof_map_size.h * 2
 		};
 	}
+	
+	struct URect {
+		UCoord coord;
+		Area area;
+
+		constexpr operator SDL_Rect() const {
+			SDL_Rect r;
+			r.x = coord.x;
+			r.y = coord.y;
+			r.w = area.w;
+			r.h = area.h;
+			return r;
+		}
+	};
+	constexpr inline bool operator==(URect lfs, URect rfs) {
+		return lfs.coord == rfs.coord && lfs.area == rfs.area;
+	}
+	constexpr inline bool operator!=(URect lfs, URect rfs) {
+		return lfs.coord != rfs.coord || lfs.area != rfs.area;
+	}
+
 
 	/*
 	 * Calculate the actual coord of chessman on the screen, according to the coord of chessman on the map.
@@ -281,21 +302,20 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	/*
 	 * Calculate the actual rectangle the chessman occupied on the screen.
 	 */
-	SDL_Rect chessman_rect_on_screen(UCoord coord) {
+	URect chessman_rect_on_screen(UCoord coord) {
 		assert(coord.x < map_size.w && coord.y < map_size.h);
 		const UCoord central_point = chessman_coord_on_screen(coord);
 		return {
-			static_cast<int>(central_point.x - CHESSMAN_AREA.w / 2),
-			static_cast<int>(central_point.y - CHESSMAN_AREA.h / 2),
-			CHESSMAN_AREA.w,
-			CHESSMAN_AREA.h
+			{central_point.x - CHESSMAN_AREA.w / 2,
+				central_point.y - CHESSMAN_AREA.h / 2},
+			{CHESSMAN_AREA.w, CHESSMAN_AREA.h}
 		};
 	}
 
-	constexpr static bool ucoord_in_rect(UCoord coord, SDL_Rect rect) {
-		int x = coord.x;
-		int y = coord.y;
-		return x >= rect.x && y >= rect.y && x - rect.x < rect.w && y - rect.y < rect.h;
+	constexpr static bool ucoord_in_rect(UCoord coord, URect rect) {
+		return coord.x >= rect.coord.x && coord.y >= rect.coord.y
+			&& coord.x - rect.coord.x < rect.area.w
+			&& coord.y - rect.coord.y < rect.area.h;
 	}
 
 	void filledCircleRGBA(SDL_Surface *sur, int x, int y, int radius, Uint32 color) {
@@ -452,7 +472,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		 *
 		 * Return the region rendered on.
 		 */
-		SDL_Rect render_text(const string_view string,
+		URect render_text(SDL_Renderer *render,
+				const string_view string,
 				UCoord topleft_position,
 				Area extra_advance = DEFAULT_EXTRA_ADVANCE) const;
 
@@ -492,8 +513,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		SDL_Surface *font_surface;
 		SDL_Texture *font_texture;
-
-		SDL_Renderer *render;
 	};
 	Font::Font(SDL_PixelFormat *format, SDL_Renderer *render, SDL_Color color) :
 		back(color.r == 0 && color.g == 0 && color.b == 0 ? SDL_Color{255, 255, 255, 255} : SDL_Color{0, 0, 0, 255}) {
@@ -525,18 +544,17 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		/// SDL_SetSurfaceRLE(font_surface, SDL_TRUE);
 
 		font_texture = SDL_CreateTextureFromSurface(render, font_surface);
-		this->render = render;
 	}
 	Font::~Font() {
 		SDL_FreeSurface(font_surface);
 		SDL_DestroyTexture(font_texture);
 	}
-	SDL_Rect Font::render_text(const string_view str, UCoord pos, Area extra_advance) const {
+	URect Font::render_text(SDL_Renderer *render, const string_view str, UCoord pos, Area extra_advance) const {
 		SDL_Rect srcrect{0, 0, CHARACTER_SIZE.w, CHARACTER_SIZE.h}, dstrect{0, 0, CHARACTER_SIZE.w, CHARACTER_SIZE.h};
 		dstrect.x = pos.x;
 		dstrect.y = pos.y;
-		SDL_Rect region{ static_cast<int>(pos.x), static_cast<int>(pos.y), 0, 1};
-		int region_width_temp = 0;
+		URect region{ {pos.x, pos.y}, {0, 1} };
+		uint_type region_width_temp = 0;
 		for(char c : str) {
 			c = toupper(c);
 			bool right_advance = false, down_advance = false;
@@ -552,19 +570,21 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			if(right_advance) {
 				dstrect.x += CHARACTER_SIZE.w + extra_advance.w;
 				++region_width_temp;
-				if(region_width_temp > region.w) {
-					region.w = region_width_temp;
+				if(region_width_temp > region.area.w) {
+					region.area.w = region_width_temp;
 				}
 			}
 			if(down_advance) {
 				dstrect.x = pos.x;
 				dstrect.y += CHARACTER_SIZE.h + extra_advance.h;
-				++region.h;
+				++region.area.h;
 				region_width_temp = 0;
 			}
 		}
-		if(region.w != 0) region.w = region.w * (CHARACTER_SIZE.w + extra_advance.w) - extra_advance.w;
-		region.h = region.h * (CHARACTER_SIZE.h + extra_advance.h) - extra_advance.h;
+		if(region.area.w != 0) {
+			region.area.w = region.area.w * (CHARACTER_SIZE.w + extra_advance.w) - extra_advance.w;
+		}
+		region.area.h = region.area.h * (CHARACTER_SIZE.h + extra_advance.h) - extra_advance.h;
 		return region;
 	}
 	SDL_Surface *Font::create_surface_from_text(SDL_PixelFormat *format, const string_view str, Area extra_advance) const {
@@ -611,81 +631,141 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		return area;
 	}
 
+	class WidgetManager;
 
-	class ButtonManager;
+	class Widget {
+		friend class WidgetManager;
+	public:
+		Widget();
+		Widget(URect r) : region(r) {}
+		Widget(const Widget &);
+		Widget(Widget &&);
 
-	class Button {
+		/*
+		 * Should be called when a mouse click event occurs.
+		 * Requires the relative position of mouse.
+		 */
+		void on_click(UCoord c) {on_click_function(c);}
+
+		/*
+		 * Should be called when a mouse hovers on the widget.
+		 * Requires the relative position of mouse.
+		 */
+		void on_mouse_move_on(UCoord c) {on_mouse_move_on_function(c);}
+
+		void on_mouse_move_out() {on_mouse_move_out_function();}
+
+		void draw() {draw_function();}
+
+	protected:
+		URect region;
+
+		virtual void on_click_function(UCoord) = 0;
+		virtual void on_mouse_move_on_function(UCoord) = 0;
+		virtual void on_mouse_move_out_function() = 0;
+		virtual void draw_function() = 0;
+	
+	};
+
+	class WidgetManager {
+	public:
+		WidgetManager() {}
+
+		void register_widget(Widget widget) {
+			widgets.push_back(std::move(widget));
+		}
+
+		void draw() {
+			for(Widget &widget: widgets) {
+				widget.draw();
+			}
+		}
+
+		void mouse_button_down(UCoord mouse_coord);
+		void mouse_move(UCoord mouse_coord);
+	private:
+		struct WidgetNode {
+			Widget widget;
+			bool mouse_hovering;
+		};
+		std::vector<Widget> widgets;
+	};
+
+	void WidgetManager::mouse_button_down(UCoord c) {
+		for(Widget &widget: widgets) {
+			if(ucoord_in_rect(c, widget.region)) {
+				widget.on_click({c.x - widget.region.coord.x, c.y - widget.region.coord.y});
+			}
+		}
+	}
+	void WidgetManager::mouse_move(UCoord c) {
+		;
+	}
+
+
+
+	class Button : public Widget {
 		friend class ButtonManager;
 
 		using on_click_callback_t = void(UCoord);
 	public:
-		Button(std::string_view button_title, const SDL_Rect button_region) :
-			region(button_region), title(button_title) {}
-		Button(std::string_view button_title, const SDL_Rect button_region, std::function<on_click_callback_t> onclick) :
-			region(button_region), title(button_title), on_click_callback(std::move(onclick)) {}
-		Button(Button &&b) : region(b.region), title(std::move(b.title)), on_click_callback(std::move(b.on_click_callback)) {}
+		Button(SDL_Renderer *render_, const Font &font_, std::string_view button_title, const URect button_region) :
+			Widget(button_region), title(button_title), render(render_), font(font_) {}
+		Button(SDL_Renderer *render_, const Font &font_, Button &&b) :
+			Widget(b.region),
+			title(std::move(b.title)),
+			on_click_callback(std::move(b.on_click_callback)),
+			render(render_),
+			font(font_) {}
 
-		Button(const Button &) = delete;
+		Button(const Button &button) :
+			Widget(button.region), title(button.title), render(button.render), font(button.font) {}
 		Button &operator=(const Button &) = delete;
 
 		void set_on_click(std::function<on_click_callback_t> func) {
 			on_click_callback = std::move(func);
 		}
-	private:
-		SDL_Rect region;
-		std::string_view title;
-		std::function<on_click_callback_t> on_click_callback;
-	};
-
-	class ButtonManager {
-		// constexpr static SDL_Color BUTTON_BORDER_COLOR = {30, 30, 30, 255};
-	public:
-		ButtonManager(SDL_Renderer *render_, const Font &font_) : render(render_), font(font_) {}
-		ButtonManager(const ButtonManager &) = delete;
-		ButtonManager &operator=(const ButtonManager &) = delete;
-
-		void add_button(Button &&b) {
-			buttons.emplace_back(std::move(b));
+	protected:
+		virtual void on_click_function(UCoord c) override {
+			assert(*on_click_callback.target<on_click_callback_t>());
+			on_click_callback(c);
 		}
 
-		void draw(bool mouse_hover = false, UCoord mouse_coord = {0, 0}) const;
-		bool click_event(UCoord mouse_coord);
-	private:
-		std::vector<Button> buttons;
-		SDL_Renderer *render;
-		const Font &font;
-	};
+		virtual void on_mouse_move_on_function(UCoord) override {
+			mouse_hovering = true;
+		}
 
-	void ButtonManager::draw(bool mouse_hover, UCoord mouse_coord) const {
-		for(const Button &b : buttons) {
-			font.render_text(b.title, {
-				b.region.x + b.region.w / 2 - Font::text_size(b.title).w / 2,
-				static_cast<uint_type>(b.region.y)
+		virtual void on_mouse_move_out_function() override {
+			mouse_hovering = false;
+		}
+
+		virtual void draw_function() override {
+			font.render_text(render, title, {
+				region.coord.x + region.area.w / 2 - Font::text_size(title).w / 2,
+				region.coord.y
 			});
 			// SDL_SetRenderDrawColor(render, BUTTON_BORDER_COLOR.r,
 			// 		BUTTON_BORDER_COLOR.g,
 			// 		BUTTON_BORDER_COLOR.b,
 			// 		BUTTON_BORDER_COLOR.a);
-			// SDL_RenderDrawRect(render, &b.region);
-			if(mouse_hover) {
-				if(ucoord_in_rect(mouse_coord, b.region)) {
-					SDL_SetRenderDrawColor(render, 255, 255, 255, 60);
-					SDL_RenderFillRect(render, &b.region);
-				}
+			// SDL_RenderDrawRect(render, &region);
+			if(mouse_hovering) {
+				SDL_SetRenderDrawColor(render, 255, 255, 255, 60);
+				SDL_Rect rect = region;
+				SDL_RenderFillRect(render, &rect);
 			}
-		}
-	}
-	bool ButtonManager::click_event(UCoord mouse_coord) {
-		for(const Button &b : buttons) {
-			if(ucoord_in_rect(mouse_coord, b.region)) {
-				b.on_click_callback(mouse_coord);
-				return true;
-			}
-		}
-		return false;
-	}
 
-	
+		}
+		
+	private:
+		std::string_view title;
+		std::function<on_click_callback_t> on_click_callback;
+
+		bool mouse_hovering;
+
+		SDL_Renderer *render;
+		const Font &font;
+	};
 
 	/*
 	 * Frontend with SDL2.
@@ -703,7 +783,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		SDL_Renderer *render;
 		SDL_Texture *background_texture;
 		Font *font;
-		ButtonManager *button_manager;
+		WidgetManager widget_manager;
 
 		SDL_Texture *black_chessman_texture, *black_chessman_transparent_texture;
 		SDL_Texture *white_chessman_texture, *white_chessman_transparent_texture;
@@ -761,21 +841,23 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		font = new Font(screen->format, render, {0x20, 0x20, 0x20, 0xFF});
 
 
-		button_manager = new ButtonManager(render, *font); // Buttons
-
 		constexpr Area reset_area = Font::text_size("reset");
-		Button reset("reset", {static_cast<int>(DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w),
-				static_cast<int>(background_blank_outof_map_size.h * 4 / 3 + real_map_size.h),
-				reset_area.w, reset_area.h});
+		Button reset(render, *font, "reset", {
+			{ DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w,
+				background_blank_outof_map_size.h * 4 / 3 + real_map_size.h },
+			{ reset_area.w, reset_area.h }
+		});
 		reset.set_on_click([this] (UCoord) {
 			game.clear();
 		});
-		button_manager->add_button(std::move(reset));
+		widget_manager.register_widget(reset);
 
 		constexpr Area exit_area = Font::text_size("exit");
-		Button exit("exit", {static_cast<int>(window_size.w - DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w - exit_area.w),
-				static_cast<int>(background_blank_outof_map_size.h * 4 / 3 + real_map_size.h),
-				exit_area.w, exit_area.h});
+		Button exit(render, *font, "exit", {
+			{ window_size.w - DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w - exit_area.w,
+				background_blank_outof_map_size.h * 4 / 3 + real_map_size.h },
+			{exit_area.w, exit_area.h}
+		});
 		exit.set_on_click([this](UCoord) {
 			request_stop = true;
 		});
@@ -860,7 +942,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			for(uint_type y = 0; y < map_size.h; ++y) {
 				for(uint_type x = 0; x < map_size.w; ++x) {
 					CoreGame::Unit unit = game[{x, y}];
-					SDL_Rect chessman_rect = chessman_rect_on_screen({x, y});
+					URect chessman_rect = chessman_rect_on_screen({x, y});
+					SDL_Rect r = chessman_rect;
 					// SDL_SetRenderDrawColor(render, 0, 0, 255, 255);
 					// SDL_RenderFillRect(render, &chessman_rect);
 					if(ucoord_in_rect(mouse_coord, chessman_rect)) {
@@ -871,22 +954,22 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 					if(unit == CoreGame::Unit::EMPTY) {
 						if(selected_chessman && selected_chessman_coord == UCoord{x, y}) {
 							if(game.is_white_turn())
-								SDL_RenderCopy(render, white_chessman_transparent_texture, nullptr, &chessman_rect);
+								SDL_RenderCopy(render, white_chessman_transparent_texture, nullptr, &r);
 							else
-								SDL_RenderCopy(render, black_chessman_transparent_texture, nullptr, &chessman_rect);
+								SDL_RenderCopy(render, black_chessman_transparent_texture, nullptr, &r);
 						}
 					} else {
 						if(unit == CoreGame::Unit::WHITE)
-							SDL_RenderCopy(render, white_chessman_texture, nullptr, &chessman_rect);
+							SDL_RenderCopy(render, white_chessman_texture, nullptr, &r);
 						else
-							SDL_RenderCopy(render, black_chessman_texture, nullptr, &chessman_rect);
+							SDL_RenderCopy(render, black_chessman_texture, nullptr, &r);
 					}
 				}
 			}
 
 
 			if(mouse_down) {
-				if(!button_manager->click_event(mouse_coord)) {
+				if(!widget_manager.click_event(mouse_coord)) {
 					if(game.status() == CoreGame::Status::NONE) {
 						if(selected_chessman && game[selected_chessman_coord] == CoreGame::Unit::EMPTY) {
 							game.place(selected_chessman_coord);
@@ -899,7 +982,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			if(game.status() == CoreGame::Status::NONE) {
 				const char *prompt = game.is_white_turn() ? "white's turn" : "black's turn";
 				const Area prompt_size = Font::text_size(prompt);
-				font->render_text(prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
+				font->render_text(render, prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
 			} else { //Some one won
 				std::pair<UCoord, UCoord> rows = {
 					chessman_coord_on_screen(game.get_rows().first),
@@ -909,12 +992,12 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				SDL_RenderDrawLine(render, rows.first.x, rows.first.y, rows.second.x, rows.second.y);
 				const char *prompt = game.is_white_turn() ? "white won!" : "black won!";
 				const Area prompt_size = Font::text_size(prompt);
-				font->render_text(prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
+				font->render_text(render, prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
 			}
 
 
 			SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
-			button_manager->draw(true, mouse_coord);
+			widget_manager.draw();
 
 			if(software_rendering) {
 				SDL_UpdateWindowSurface(window);

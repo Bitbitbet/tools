@@ -47,10 +47,10 @@ namespace console {
 	inline Color3::operator Color() const {return {r, g, b, 0b11111111};}
 	inline Color::operator Color3() const {return {r, g, b};}
 
-	constexpr bool operator==(Coord lfs, Coord rfs) {return lfs.x == rfs.x && lfs.y == rfs.y;}
-	constexpr bool operator==(UCoord lfs, UCoord rfs) {return lfs.x == rfs.x && lfs.y == rfs.y;}
-	constexpr bool operator==(Area lfs, Area rfs) {return lfs.w == rfs.w && lfs.h == rfs.h;}
-	constexpr bool operator==(Color lfs, Color rfs) {
+	constexpr inline bool operator==(Coord lfs, Coord rfs) {return lfs.x == rfs.x && lfs.y == rfs.y;}
+	constexpr inline bool operator==(UCoord lfs, UCoord rfs) {return lfs.x == rfs.x && lfs.y == rfs.y;}
+	constexpr inline bool operator==(Area lfs, Area rfs) {return lfs.w == rfs.w && lfs.h == rfs.h;}
+	constexpr inline bool operator==(Color lfs, Color rfs) {
 		return lfs.r == rfs.r &&
 			lfs.g == rfs.g &&
 			lfs.b == rfs.b &&
@@ -62,11 +62,11 @@ namespace console {
 			lfs.b == rfs.b;
 	}
 
-	constexpr bool operator!=(Coord lfs, Coord rfs) {return !(lfs == rfs);}
-	constexpr bool operator!=(UCoord lfs, UCoord rfs) {return !(lfs == rfs);}
-	constexpr bool operator!=(Area lfs, Area rfs) {return !(lfs == rfs);}
-	constexpr bool operator!=(Color lfs, Color rfs) {return !(lfs == rfs);}
-	constexpr bool operator!=(Color3 lfs, Color3 rfs) {return !(lfs == rfs);}
+	constexpr inline bool operator!=(Coord lfs, Coord rfs) {return !(lfs == rfs);}
+	constexpr inline bool operator!=(UCoord lfs, UCoord rfs) {return !(lfs == rfs);}
+	constexpr inline bool operator!=(Area lfs, Area rfs) {return !(lfs == rfs);}
+	constexpr inline bool operator!=(Color lfs, Color rfs) {return !(lfs == rfs);}
+	constexpr inline bool operator!=(Color3 lfs, Color3 rfs) {return !(lfs == rfs);}
 
 
 	enum class Key : uint8_t {
