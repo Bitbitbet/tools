@@ -1,6 +1,4 @@
-#include <SDL2/SDL_pixels.h>
-#include <SDL2/SDL_render.h>
-#include <SDL2/SDL_surface.h>
+#include "SDL2/SDL_timer.h"
 #include <memory>
 #include <vector>
 #include <iostream>
@@ -47,6 +45,8 @@ enum class Mode {
 } mode = Mode::all;
 
 bool software_rendering = false;
+
+bool enable_trick = false;
 
 
 
@@ -608,7 +608,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		 * Note that the WidgetManager will save the reference of given instance of Widget.
 		 */
 		void register_widget(Widget &widget) {
-			widgets.emplace_back(widget);
+			widgets.push_back({widget, false});
 		}
 
 		void draw();
@@ -617,9 +617,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		void mouse_move(UCoord mouse_coord);
 	private:
 		struct WidgetNode {
-			template<typename T>
-			WidgetNode(T &widget_): widget(widget_), mouse_hovering(false) {}
-
 			Widget &widget;
 			bool mouse_hovering;
 		};
@@ -675,6 +672,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		void set_on_click(std::function<on_click_callback_t> func) {
 			on_click_callback = std::move(func);
 		}
+
+		URect &get_region() {return region;}
 	private:
 		virtual void on_click_function(UCoord c) override {
 			on_click_callback(c);
@@ -717,6 +716,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		~Chessboard();
 
 		void reset();
+
+		URect &get_region() {return region;}
 	private:
 		/*
 		 * Calculate the actual coord of chessman on the screen, according to the coord of chessman on the map.
@@ -1040,6 +1041,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	}
 
 	void Game::start() {
+		Uint64 trick_helper= 0; //ONLY FOR TRICK
 		while(!request_stop) {
 			SDL_SetRenderDrawColor(render, BACKGROUND_COLOR.r, BACKGROUND_COLOR.g, BACKGROUND_COLOR.b, 255);
 			SDL_RenderClear(render);
@@ -1064,6 +1066,14 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				}
 			}
 
+			if (enable_trick) {
+				chessboard->get_region().coord.x = background_blank_outof_map_size.w * (sin(SDL_GetTicks64() * M_PI / 5 / 180) + 1);
+				if(SDL_GetTicks64() - trick_helper >= 500) {
+					std::swap(exit_button->get_region().coord, reset_button->get_region().coord);
+					trick_helper = SDL_GetTicks64();
+				}
+			}
+
 			widget_manager->mouse_move(mouse_coord);
 			if(mouse_down) {
 				widget_manager->mouse_button_down(mouse_coord);
@@ -1075,7 +1085,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			} else {
 				SDL_RenderPresent(render);
 			}
-			SDL_Delay(1);
 		}
 	}
 }
@@ -1365,7 +1374,7 @@ namespace frontend_with_console {
 int process_argument(size_t argc, char **argv) {
 	ArgumentProcessor ap;
 
-	Argument help, map_size_arg, rows, switch_mode, enable_software_rendering;
+	Argument help, map_size_arg, rows, switch_mode, enable_software_rendering, enable_trick_arg;
 
 	help.add_name("-h").add_name("--help").add_name("--usage");
 	help.set_argc(0);
@@ -1450,11 +1459,19 @@ int process_argument(size_t argc, char **argv) {
 		software_rendering = true;
 	});
 
+	enable_trick_arg.add_name("--enable-trick");
+	enable_trick_arg.set_argc(0);
+	enable_trick_arg.set_description("Enable a funny trick. But I don't think it is funny at all.");
+	enable_trick_arg.set_act_func([] (char **) {
+		enable_trick = true;
+	});
+
 	ap.register_argument(help);
 	ap.register_argument(map_size_arg);
 	ap.register_argument(rows);
 	ap.register_argument(switch_mode);
 	ap.register_argument(enable_software_rendering);
+	ap.register_argument(enable_trick_arg);
 
 	return ap.process(argc, argv) ? 0 : 1;
 }
