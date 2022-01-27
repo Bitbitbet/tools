@@ -588,7 +588,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		void on_mouse_move_out() {on_mouse_move_out_function();}
 
-		void draw(bool mouse_hovering) {draw_function(mouse_hovering);}
+		void draw(SDL_Renderer *render, bool mouse_hovering) {draw_function(render, mouse_hovering);}
 
 	protected:
 		URect region;
@@ -596,13 +596,12 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		virtual void on_click_function(UCoord) = 0;
 		virtual void on_mouse_move_on_function(UCoord) = 0;
 		virtual void on_mouse_move_out_function() = 0;
-		virtual void draw_function(bool mouse_hovering) = 0;
-	
+		virtual void draw_function(SDL_Renderer *render, bool mouse_hovering) = 0;
 	};
 
 	class WidgetManager {
 	public:
-		WidgetManager() = default;
+		WidgetManager(SDL_Renderer *render_) : render(render_) {}
 
 		/*
 		 * Register a widget.
@@ -625,6 +624,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			bool mouse_hovering;
 		};
 		std::vector<WidgetNode> widgets;
+		SDL_Renderer *render;
 	};
 
 	bool WidgetManager::mouse_button_down(UCoord c) {
@@ -653,7 +653,9 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	}
 	void WidgetManager::draw() {
 		for(WidgetNode &widget_node: widgets) {
-			widget_node.widget.draw(widget_node.mouse_hovering);
+			SDL_Rect rect = widget_node.widget.region;
+			SDL_RenderSetViewport(render, &rect);
+			widget_node.widget.draw(render, widget_node.mouse_hovering);
 		}
 	}
 
@@ -664,10 +666,10 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		using on_click_callback_t = void(UCoord);
 	public:
-		Button(SDL_Renderer *render_, const Font &font_, std::string_view button_title, const URect button_region) :
-			Widget(button_region), title(button_title), render(render_), font(font_) {}
+		Button(const Font &font_, std::string_view button_title, const URect button_region) :
+			Widget(button_region), title(button_title), font(font_) {}
 		Button(const Button &button) :
-			Widget(button), title(button.title), on_click_callback(button.on_click_callback), render(button.render), font(button.font) {}
+			Widget(button), title(button.title), on_click_callback(button.on_click_callback), font(button.font) {}
 		Button &operator=(const Button &) = delete;
 
 		void set_on_click(std::function<on_click_callback_t> func) {
@@ -682,20 +684,19 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		virtual void on_mouse_move_out_function() override {}
 
-		virtual void draw_function(bool mouse_hovering) override;
+		virtual void draw_function(SDL_Renderer*render, bool mouse_hovering) override;
 
 		std::string_view title;
 		std::function<on_click_callback_t> on_click_callback;
 
-		SDL_Renderer *render;
 		const Font &font;
 
 
 	};
-	void Button::draw_function(bool mouse_hovering) {
+	void Button::draw_function(SDL_Renderer* render, bool mouse_hovering) {
 		font.render_text(render, title, {
-			region.coord.x + region.area.w / 2 - Font::text_size(title).w / 2,
-			region.coord.y
+			region.area.w / 2 - Font::text_size(title).w / 2,
+			0
 		});
 		// SDL_SetRenderDrawColor(render, BUTTON_BORDER_COLOR.r,
 		// 		BUTTON_BORDER_COLOR.g,
@@ -704,8 +705,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		// SDL_RenderDrawRect(render, &region);
 		if(mouse_hovering) {
 			SDL_SetRenderDrawColor(render, 255, 255, 255, 60);
-			SDL_Rect rect = region;
-			SDL_RenderFillRect(render, &rect);
+			SDL_RenderFillRect(render, nullptr);
 		}
 	}
 
@@ -713,7 +713,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		constexpr static Area CHESSMAN_AREA = { (BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH) * 3 / 4,
 				(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH) * 3 / 4 };
 	public:
-		Chessboard(SDL_Renderer *render, SDL_PixelFormat *format, Font &font, UCoord position);
+		Chessboard(SDL_Renderer *render, SDL_PixelFormat *format, UCoord position);
 		~Chessboard();
 
 		void reset();
@@ -735,7 +735,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		virtual void on_mouse_move_on_function(UCoord mouse_coord) override;
 		virtual void on_mouse_move_out_function() override;
 		virtual void on_click_function(UCoord mouse_coord) override;
-		virtual void draw_function(bool mouse_hovering) override;
+		virtual void draw_function(SDL_Renderer *render, bool mouse_hovering) override;
 
 		bool is_selecting_chessman;
 		UCoord coord_of_chessman_selecting;
@@ -745,15 +745,10 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		SDL_Texture *black_chessman_texture, *black_chessman_transparent_texture;
 		SDL_Texture *white_chessman_texture, *white_chessman_transparent_texture;
-
-		SDL_Renderer *render;
-		Font &font;
 	};
 
-	Chessboard::Chessboard(SDL_Renderer *render_, SDL_PixelFormat *format, Font &font_, UCoord position) :
-		Widget({position, real_map_size}),
-		render(render_),
-		font(font_)
+	Chessboard::Chessboard(SDL_Renderer *render, SDL_PixelFormat *format, UCoord position) :
+		Widget({position, real_map_size})
 	{
 		reset();
 
@@ -831,16 +826,13 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			}
 		}
 	}
-	void Chessboard::draw_function(bool /* mouse_hovering */) {
-		SDL_Rect rect = region;
-		SDL_RenderCopy(render, background_texture, nullptr, &rect);
+	void Chessboard::draw_function(SDL_Renderer *render, bool /* mouse_hovering */) {
+		SDL_RenderCopy(render, background_texture, nullptr, nullptr);
 
 		for(uint_type y = 0; y < map_size.h; ++y) {
 			for(uint_type x = 0; x < map_size.w; ++x) {
 				CoreGame::Unit unit = game[{x, y}];
 				URect chessman_rect = chessman_rect_on_screen({x, y});
-				chessman_rect.coord.x += region.coord.x;
-				chessman_rect.coord.y += region.coord.y;
 				SDL_Rect r = chessman_rect;
 
 				if(unit == CoreGame::Unit::EMPTY) {
@@ -859,25 +851,26 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			}
 		}
 
-		uint_type TEXT_Y_POS = background_blank_outof_map_size.h / 3;
+		// uint_type TEXT_Y_POS = background_blank_outof_map_size.h / 3;
 		if(game.status() == CoreGame::Status::NONE) {
-			const char *prompt = game.is_white_turn() ? "white's turn" : "black's turn";
-			const Area prompt_size = Font::text_size(prompt);
-			font.render_text(render, prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
+			/*
+			 * const char *prompt = game.is_white_turn() ? "white's turn" : "black's turn";
+			 * const Area prompt_size = Font::text_size(prompt);
+			 * font.render_text(render, prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
+			 */
 		} else { //Some one won
 			std::pair<UCoord, UCoord> rows = {
 				chessman_coord_on_screen(game.get_rows().first),
 				chessman_coord_on_screen(game.get_rows().second)
 			};
-			rows.first.x += region.coord.x;
-			rows.first.y += region.coord.y;
-			rows.second.x += region.coord.x;
-			rows.second.y += region.coord.y;
 			SDL_SetRenderDrawColor(render, 255, 100, 100, 255);
 			SDL_RenderDrawLine(render, rows.first.x, rows.first.y, rows.second.x, rows.second.y);
-			const char *prompt = game.is_white_turn() ? "white won!" : "black won!";
-			const Area prompt_size = Font::text_size(prompt);
-			font.render_text(render, prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
+
+			/* 
+			 * const char *prompt = game.is_white_turn() ? "white won!" : "black won!";
+			 * const Area prompt_size = Font::text_size(prompt);
+			 * font.render_text(render, prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
+			 */
 		}
 
 
@@ -955,13 +948,12 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		Button *reset_button, *exit_button;
 		Chessboard *chessboard;
-		WidgetManager widget_manager;
+		WidgetManager *widget_manager;
 
 		bool request_stop;
 	};
 
-	Game::Game() {
-		request_stop = false;
+	Game::Game() : request_stop(false) {
 		// Initialize SDL2
 		if(SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO) < 0) {
 			log_error("Error initializing SDL2: %s.", SDL_GetError());
@@ -1007,8 +999,10 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 
 		// Setting up widgets
+		widget_manager = new WidgetManager(render);
+
 		constexpr Area reset_area = Font::text_size("reset");
-		reset_button = new Button(render, *font, "reset", {
+		reset_button = new Button(*font, "reset", {
 			{ DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w,
 				background_blank_outof_map_size.h * 4 / 3 + real_map_size.h },
 			{ reset_area.w, reset_area.h }
@@ -1016,10 +1010,10 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		reset_button->set_on_click([this] (UCoord) {
 			chessboard->reset();
 		});
-		widget_manager.register_widget(*reset_button);
+		widget_manager->register_widget(*reset_button);
 
 		constexpr Area exit_area = Font::text_size("exit");
-		exit_button = new Button(render, *font, "exit", {
+		exit_button = new Button(*font, "exit", {
 			{ window_size.w - DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w - exit_area.w,
 				background_blank_outof_map_size.h * 4 / 3 + real_map_size.h },
 			{exit_area.w, exit_area.h}
@@ -1027,17 +1021,19 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		exit_button->set_on_click([this](UCoord) {
 			request_stop = true;
 		});
-		widget_manager.register_widget(*exit_button);
+		widget_manager->register_widget(*exit_button);
 
-		chessboard = new Chessboard(render, screen->format, *font, background_blank_outof_map_size);
-		widget_manager.register_widget(*chessboard);
+		chessboard = new Chessboard(render, screen->format, background_blank_outof_map_size);
+		widget_manager->register_widget(*chessboard);
 	}
 
 	Game::~Game() {
-		delete font;
 		delete reset_button;
 		delete exit_button;
 		delete chessboard;
+		delete widget_manager;
+		delete font;
+
 		SDL_DestroyRenderer(render);
 		SDL_DestroyWindow(window);
 		SDL_Quit();
@@ -1068,11 +1064,11 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				}
 			}
 
-			widget_manager.mouse_move(mouse_coord);
+			widget_manager->mouse_move(mouse_coord);
 			if(mouse_down) {
-				widget_manager.mouse_button_down(mouse_coord);
+				widget_manager->mouse_button_down(mouse_coord);
 			}
-			widget_manager.draw();
+			widget_manager->draw();
 
 			if(software_rendering) {
 				SDL_UpdateWindowSurface(window);

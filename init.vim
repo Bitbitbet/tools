@@ -271,7 +271,6 @@ noremap <silent> <LEADER>j <C-w>j
 noremap <silent> <LEADER>k <C-w>k
 noremap <silent> <LEADER>l <C-w>l
 
-syntax off
 " filetype indent off
 " set nocindent
 " set nosmartindent
