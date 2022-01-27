@@ -1,4 +1,3 @@
-#include "SDL2/SDL_timer.h"
 #include <memory>
 #include <vector>
 #include <iostream>
@@ -654,6 +653,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			SDL_RenderSetViewport(render, &rect);
 			widget_node.widget.draw(render, widget_node.mouse_hovering);
 		}
+		SDL_RenderSetViewport(render, nullptr);
 	}
 
 
