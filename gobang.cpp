@@ -683,7 +683,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	private:
 		struct WidgetNode {
 			template<typename T>
-			WidgetNode(T &&widget_): widget(std::make_unique<T>(widget_)), mouse_hovering(false) {}
+			WidgetNode(T &&widget_): widget(std::make_unique<std::decay_t<T>>(widget_)), mouse_hovering(false) {}
 
 			std::unique_ptr<Widget> widget;
 			bool mouse_hovering;
@@ -738,7 +738,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			font(font_) {}
 
 		Button(const Button &button) :
-			Widget(button.region), title(button.title), render(button.render), font(button.font) {}
+			Widget(button.region), title(button.title), on_click_callback(button.on_click_callback), render(button.render), font(button.font) {}
 		Button &operator=(const Button &) = delete;
 
 		void set_on_click(std::function<on_click_callback_t> func) {
@@ -746,7 +746,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		}
 	protected:
 		virtual void on_click_function(UCoord c) override {
-			assert(*on_click_callback.target<on_click_callback_t>());
 			on_click_callback(c);
 		}
 
@@ -980,6 +979,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			}
 
 
+			widget_manager.mouse_move(mouse_coord);
 			if(mouse_down) {
 				if(!widget_manager.mouse_button_down(mouse_coord)) {
 					if(game.status() == CoreGame::Status::NONE) {
