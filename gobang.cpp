@@ -843,12 +843,14 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 				--cursor_position;
 				m_calculate_viewport();
 			}
+			tick = SDL_GetTicks64(); // Avoid key flashing when moving the cursor.
 			return;
 		}
 		if(key == SDLK_DELETE) {
 			if(cursor_position != m_content.size()) {
 				m_content.erase(cursor_position, 1);
 			}
+			tick = SDL_GetTicks64(); // Avoid key flashing when moving the cursor.
 			return;
 		}
 		std::pair<bool, char> result = m_printable_character(key);
@@ -856,6 +858,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 			m_content.insert(m_content.begin() + cursor_position, result.second);
 			++cursor_position;
 			m_calculate_viewport();
+			tick = SDL_GetTicks64(); // Avoid key flashing when moving the cursor.
 			return;
 		}
 		if(key == SDLK_RETURN) {
@@ -916,6 +919,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 			case SDLK_z: return {true, 'Z'};
 			case SDLK_SPACE: return{true, ' '};
 			case SDLK_PERIOD: return{true, '.'};
+			case SDLK_COMMA: return {true, ','};
 		}
 		return {false, 0};
 	}
@@ -989,6 +993,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		virtual void draw_function(SDL_Renderer *render, bool mouse_hovering) override;
 
 		void m_key_pressed(SDL_Keycode);
+		void m_select_chessman(UCoord mouse_coord);
 
 		bool is_selecting_chessman;
 		UCoord coord_of_chessman_selecting;
@@ -1054,6 +1059,20 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		is_selecting_chessman = false;
 	}
 	void Chessboard::on_mouse_move_on_function(UCoord mouse_coord) {
+		m_select_chessman(mouse_coord);
+	}
+	void Chessboard::on_mouse_move_out_function() {
+		is_selecting_chessman = false;
+	}
+	void Chessboard::on_click_function(UCoord mouse_coord) {
+		m_select_chessman(mouse_coord);
+		if(is_selecting_chessman) {
+			if(game[coord_of_chessman_selecting] == CoreGame::Unit::EMPTY && game.status() == CoreGame::Status::NONE) {
+				game.place(coord_of_chessman_selecting);
+			}
+		}
+	}
+	void Chessboard::m_select_chessman(UCoord mouse_coord) {
 		for(uint_type y = 0; y < map_size.h; ++y) {
 			for(uint_type x = 0; x < map_size.w; ++x) {
 				if(ucoord_in_rect(mouse_coord, chessman_rect_on_screen({x, y}))) {
@@ -1068,16 +1087,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 			}
 		}
 		is_selecting_chessman = false;
-	}
-	void Chessboard::on_mouse_move_out_function() {
-		is_selecting_chessman = false;
-	}
-	void Chessboard::on_click_function(UCoord) {
-		if(is_selecting_chessman) {
-			if(game[coord_of_chessman_selecting] == CoreGame::Unit::EMPTY && game.status() == CoreGame::Status::NONE) {
-				game.place(coord_of_chessman_selecting);
-			}
-		}
 	}
 	void Chessboard::m_key_pressed(SDL_Keycode key) {
 		if(!is_selecting_chessman) {
@@ -1129,29 +1138,14 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 			}
 		}
 
-		// uint_type TEXT_Y_POS = background_blank_outof_map_size.h / 3;
-		if(game.status() == CoreGame::Status::NONE) {
-			/*
-			 * const char *prompt = game.is_white_turn() ? "white's turn" : "black's turn";
-			 * const Area prompt_size = Font::text_size(prompt);
-			 * font.render_text(render, prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
-			 */
-		} else { //Some one won
+		if(game.status() != CoreGame::Status::NONE) {
 			std::pair<UCoord, UCoord> rows = {
 				chessman_coord_on_screen(game.get_rows().first),
 				chessman_coord_on_screen(game.get_rows().second)
 			};
 			SDL_SetRenderDrawColor(render, 255, 100, 100, 255);
 			SDL_RenderDrawLine(render, rows.first.x, rows.first.y, rows.second.x, rows.second.y);
-
-			/* 
-			 * const char *prompt = game.is_white_turn() ? "white won!" : "black won!";
-			 * const Area prompt_size = Font::text_size(prompt);
-			 * font.render_text(render, prompt, {window_size.w / 2 - prompt_size.w / 2, TEXT_Y_POS});
-			 */
 		}
-
-
 	}
 
 	UCoord Chessboard::chessman_coord_on_screen(UCoord coord) {
