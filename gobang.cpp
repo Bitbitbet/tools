@@ -238,7 +238,7 @@ void CoreGame::place(UCoord c) {
 }
 
 
-namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_gfx
+namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 	constexpr SDL_Color WHITE_CHESSMAN_COLOR = {220, 220, 255, 255};
 	constexpr SDL_Color BLACK_CHESSMAN_COLOR = {40, 40, 40, 255};
 
