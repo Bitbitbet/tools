@@ -692,7 +692,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 				if(event.repeat == 0) {
 					widget_node.widget.on_key_pressed(event.keysym.scancode, event.keysym.sym);
 				} else {
-					widget_node.widget.on_key_pressed(event.keysym.scancode, event.keysym.sym);
+					widget_node.widget.on_key_typed(event.keysym.scancode, event.keysym.sym);
 				}
 			}
 		}
@@ -727,14 +727,12 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		virtual void on_key_pressed_function(SDL_Scancode, SDL_Keycode) override {}
 		virtual void on_key_typed_function(SDL_Scancode, SDL_Keycode) override {}
 		virtual void on_key_released_function(SDL_Scancode, SDL_Keycode) override {}
-		virtual void draw_function(SDL_Renderer*render, bool mouse_hovering) override;
+		virtual void draw_function(SDL_Renderer *render, bool mouse_hovering) override;
 
-		std::string_view title;
+		std::string title;
 		std::function<on_click_callback_t> on_click_callback;
 
 		const Font &font;
-
-
 	};
 	void Button::draw_function(SDL_Renderer* render, bool mouse_hovering) {
 		font.render_text(render, title, {
@@ -941,8 +939,11 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		{
 			URect coord_rect = {
 				{
-					(cursor_position - viewport_position) * (Font::CHARACTER_SIZE.w + FONT_EXTRA_ADVANCE.w), FONT_EXTRA_ADVANCE.h
-				}, {(Font::CHARACTER_SIZE.w + FONT_EXTRA_ADVANCE.w) / 10, Font::CHARACTER_SIZE.h}
+					(cursor_position - viewport_position) * (Font::CHARACTER_SIZE.w + FONT_EXTRA_ADVANCE.w),
+					FONT_EXTRA_ADVANCE.h
+				}, {
+					(Font::CHARACTER_SIZE.w + FONT_EXTRA_ADVANCE.w) / 10, Font::CHARACTER_SIZE.h
+				}
 			};
 			rect = coord_rect;
 		}
@@ -1019,28 +1020,30 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		SDL_FillRect(sur, nullptr, SDL_MapRGBA(sur->format, 255, 255, 255, 0));
 		SDL_Renderer *sur_render = SDL_CreateSoftwareRenderer(sur);
 
+		constexpr uint_type RADIUS = CHESSMAN_AREA.w > CHESSMAN_AREA.h ? CHESSMAN_AREA.h : CHESSMAN_AREA.w;
+
 		// BLACK CHESSMAN TEXTURE
 		SDL_SetRenderDrawColor(sur_render, BLACK_CHESSMAN_COLOR.r,
 				BLACK_CHESSMAN_COLOR.g, BLACK_CHESSMAN_COLOR.b, BLACK_CHESSMAN_COLOR.a);
-		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, CHESSMAN_AREA.w / 2);
+		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, RADIUS);
 		black_chessman_texture = SDL_CreateTextureFromSurface(render, sur);
 
 		// BLACK CHESSMAN TRANSPARENT TEXTURE
 		SDL_SetRenderDrawColor(sur_render, BLACK_CHESSMAN_COLOR.r,
 				BLACK_CHESSMAN_COLOR.g, BLACK_CHESSMAN_COLOR.b, 160);
-		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, CHESSMAN_AREA.w / 2);
+		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, RADIUS);
 		black_chessman_transparent_texture = SDL_CreateTextureFromSurface(render, sur);
 
 		// WHITE CHESSMAN TEXTURE
 		SDL_SetRenderDrawColor(sur_render, WHITE_CHESSMAN_COLOR.r,
 				WHITE_CHESSMAN_COLOR.g, WHITE_CHESSMAN_COLOR.b, WHITE_CHESSMAN_COLOR.a);
-		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, CHESSMAN_AREA.w / 2);
+		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, RADIUS);
 		white_chessman_texture = SDL_CreateTextureFromSurface(render, sur);
 
 		// WHITE CHESSMAN TRANSPARENT TEXTURE
 		SDL_SetRenderDrawColor(sur_render, WHITE_CHESSMAN_COLOR.r,
 				WHITE_CHESSMAN_COLOR.g, WHITE_CHESSMAN_COLOR.b, 190);
-		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, CHESSMAN_AREA.w / 2);
+		filledCircleRGBA(sur_render, CHESSMAN_AREA.w / 2, CHESSMAN_AREA.h / 2, RADIUS);
 		white_chessman_transparent_texture = SDL_CreateTextureFromSurface(render, sur);
 
 		SDL_DestroyRenderer(sur_render);
