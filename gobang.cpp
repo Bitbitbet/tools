@@ -325,7 +325,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	class Font {
 	private:
 		/*
-		 * Raw font data, with characters !... ~
+		 * Raw font data, with characters from '!' to '~'
 		 * Each pixel occupies 1 bit; Each character occupies
 		 * FONT_CHARACTER_SIZE.w * FONT_CHARACTER_SIZE.h * 1 bits.
 		 */
@@ -574,10 +574,16 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		Widget(const Widget &w) : region(w.region) {}
 
 		/*
-		 * Should be called when a mouse click event occurs.
+		 * Should be called when a mouse click event raises.
 		 * Requires the relative position of mouse.
 		 */
 		void on_click(UCoord c) {on_click_function(c);}
+
+
+		/*
+		 * Should be called when a mouse click event outside of the region, raises.
+		 */
+		void on_click_outside() {on_click_outside_function();}
 
 		/*
 		 * Should be called when a mouse hovers on the widget.
@@ -587,12 +593,15 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		void on_mouse_move_out() {on_mouse_move_out_function();}
 
+		void on_key_pressed(SDL_Keycode
+
 		void draw(SDL_Renderer *render, bool mouse_hovering) {draw_function(render, mouse_hovering);}
 
 	protected:
 		URect region;
 
 		virtual void on_click_function(UCoord) = 0;
+		virtual void on_click_outside_function() = 0;
 		virtual void on_mouse_move_on_function(UCoord) = 0;
 		virtual void on_mouse_move_out_function() = 0;
 		virtual void draw_function(SDL_Renderer *render, bool mouse_hovering) = 0;
@@ -679,6 +688,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			on_click_callback(c);
 		}
 
+		virtual void on_click_outside_function() override {}
+
 		virtual void on_mouse_move_on_function(UCoord) override {}
 
 		virtual void on_mouse_move_out_function() override {}
@@ -707,6 +718,21 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			SDL_RenderFillRect(render, nullptr);
 		}
 	}
+
+	/*
+	 * Provides a single-line text edit.
+	 */
+	class TextEdit : public Widget {
+	private:
+		constexpr static SDL_Color BORDER_UNFOCUSED_COLOR = {100, 100, 100, 255};
+		constexpr static SDL_Color BORDER_FOCUSED_COLOR = {220, 230, 250, 255};
+	public:
+		TextEdit(URect region, const Font &font_) : Widget(region), cursor_position(0), font(font_) {}
+	private:
+		std::string content;
+		uint_type cursor_position;
+		const Font &font;
+	};
 
 	class Chessboard : public Widget {
 		constexpr static Area CHESSMAN_AREA = { (BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH) * 3 / 4,
@@ -737,6 +763,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		virtual void on_mouse_move_out_function() override;
 		virtual void on_click_function(UCoord mouse_coord) override;
 		virtual void draw_function(SDL_Renderer *render, bool mouse_hovering) override;
+		virtual void on_click_outside_function() override {}
 
 		bool is_selecting_chessman;
 		UCoord coord_of_chessman_selecting;
