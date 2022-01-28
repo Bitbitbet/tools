@@ -68,7 +68,6 @@ public:
 		rows(c.rows),
 		m_is_white_turn(c.m_is_white_turn),
 		m_status(c.m_status)
-
 	{
 		map = new Unit[map_size.w * map_size.h];
 		memcpy(map, c.map, map_size.w * map_size.h * sizeof(Unit));
