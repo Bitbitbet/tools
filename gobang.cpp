@@ -418,13 +418,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 				Area extra_advance = DEFAULT_EXTRA_ADVANCE) const;
 
 		constexpr static Area text_size(string_view str, Area extra_advance = DEFAULT_EXTRA_ADVANCE);
-
-		static uint_type get_character_position(char c) {
-			assert(c >= '!' && c <= '~' && (c < 'a' || c > 'z'));
-
-			return c < 'a'? c - '!' : c - 26 - '!';
-		}
-
 	private:
 
 		/*
@@ -439,6 +432,16 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 			};
 			return condidate[(index % 4) * 16 + (RAW_FONT_DATA[index / 4] - 'A')];
 		}
+
+		/*
+		 * Get the index of character of RAW_FONT_DATA.
+		 */
+		static uint_type get_character_position(char c) {
+			assert(c >= '!' && c <= '~' && (c < 'a' || c > 'z'));
+
+			return c < 'a'? c - '!' : c - 26 - '!';
+		}
+
 
 		SDL_Color back;
 
