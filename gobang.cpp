@@ -31,6 +31,7 @@ using console::cursor_gotoxy;
 using console::screen_clear;
 
 using std::string_view;
+using std::unique_ptr;
 
 constexpr Area DEFAULT_MAP_SIZE = {15, 15};
 constexpr uint_type DEFAULT_AMOUNT_OF_ROWS = 5;
@@ -386,11 +387,10 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		constexpr static Area FONT_CHARACTER_SIZE = {14, 14};
 		constexpr static size_t SCALE_TIME = 2;
-
-		constexpr static Area DEFAULT_EXTRA_ADVANCE = {SCALE_TIME, SCALE_TIME};
 	public:
 		constexpr static size_t CHARACTER_COUNT = '~' - '!' - 26 + 1;
 		constexpr static Area CHARACTER_SIZE = {FONT_CHARACTER_SIZE.w * SCALE_TIME, FONT_CHARACTER_SIZE.h * SCALE_TIME};
+		constexpr static Area DEFAULT_EXTRA_ADVANCE = {SCALE_TIME, SCALE_TIME};
 
 		Font(SDL_PixelFormat *format, SDL_Renderer *render, SDL_Color color);
 		~Font();
@@ -593,7 +593,9 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		void on_mouse_move_out() {on_mouse_move_out_function();}
 
-		void on_key_pressed(SDL_Keycode
+		void on_key_pressed(SDL_Scancode s, SDL_Keycode k) {on_key_pressed_function(s, k);}
+		void on_key_typed(SDL_Scancode s, SDL_Keycode k) {on_key_typed_function(s, k);}
+		void on_key_released(SDL_Scancode s, SDL_Keycode k) {on_key_released_function(s, k);}
 
 		void draw(SDL_Renderer *render, bool mouse_hovering) {draw_function(render, mouse_hovering);}
 
@@ -604,7 +606,10 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		virtual void on_click_outside_function() = 0;
 		virtual void on_mouse_move_on_function(UCoord) = 0;
 		virtual void on_mouse_move_out_function() = 0;
-		virtual void draw_function(SDL_Renderer *render, bool mouse_hovering) = 0;
+		virtual void on_key_pressed_function(SDL_Scancode, SDL_Keycode) = 0;
+		virtual void on_key_typed_function(SDL_Scancode, SDL_Keycode) = 0;
+		virtual void on_key_released_function(SDL_Scancode, SDL_Keycode) = 0;
+		virtual void draw_function(SDL_Renderer *, bool) = 0;
 	};
 
 	class WidgetManager {
@@ -621,8 +626,18 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 		void draw();
 
+		/*
+		 * Should be called when a mouse click event arises.
+		 * Return whether a widget captures the event.
+		 */
 		bool mouse_button_down(UCoord mouse_coord);
+
 		void mouse_move(UCoord mouse_coord);
+
+		/*
+		 * Note that this function will send the keyboard event to all widgets.
+		 */
+		void keyboard_event(SDL_KeyboardEvent event);
 	private:
 		struct WidgetNode {
 			Widget &widget;
@@ -632,15 +647,26 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		SDL_Renderer *render;
 	};
 
-	bool WidgetManager::mouse_button_down(UCoord c) {
+	void WidgetManager::draw() {
 		for(WidgetNode &widget_node: widgets) {
-			if(ucoord_in_rect(c, widget_node.widget.region)) {
+			SDL_Rect rect = widget_node.widget.region;
+			SDL_RenderSetViewport(render, &rect);
+			widget_node.widget.draw(render, widget_node.mouse_hovering);
+		}
+		SDL_RenderSetViewport(render, nullptr);
+	}
+	bool WidgetManager::mouse_button_down(UCoord c) {
+		bool captured = false; // used to record whether the click event is already captured by a widget.
+		for(WidgetNode &widget_node: widgets) {
+			if(ucoord_in_rect(c, widget_node.widget.region) && !captured) {
 				UCoord coord = widget_node.widget.region.coord;
 				widget_node.widget.on_click({c.x - coord.x, c.y - coord.y});
-				return true;
+				captured = true;
+			} else {
+				widget_node.widget.on_click_outside();
 			}
 		}
-		return false;
+		return captured;
 	}
 	void WidgetManager::mouse_move(UCoord c) {
 		for(WidgetNode &widget_node: widgets) {
@@ -656,13 +682,18 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			}
 		}
 	}
-	void WidgetManager::draw() {
-		for(WidgetNode &widget_node: widgets) {
-			SDL_Rect rect = widget_node.widget.region;
-			SDL_RenderSetViewport(render, &rect);
-			widget_node.widget.draw(render, widget_node.mouse_hovering);
+	void WidgetManager::keyboard_event(SDL_KeyboardEvent event) {
+		for(WidgetNode &widget_node : widgets) {
+			if(event.state == SDL_RELEASED) {
+				widget_node.widget.on_key_released(event.keysym.scancode, event.keysym.sym);
+			} else if(event.state == SDL_PRESSED) {
+				if(event.repeat == 0) {
+					widget_node.widget.on_key_pressed(event.keysym.scancode, event.keysym.sym);
+				} else {
+					widget_node.widget.on_key_pressed(event.keysym.scancode, event.keysym.sym);
+				}
+			}
 		}
-		SDL_RenderSetViewport(render, nullptr);
 	}
 
 
@@ -689,11 +720,11 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		}
 
 		virtual void on_click_outside_function() override {}
-
 		virtual void on_mouse_move_on_function(UCoord) override {}
-
 		virtual void on_mouse_move_out_function() override {}
-
+		virtual void on_key_pressed_function(SDL_Scancode, SDL_Keycode) override {}
+		virtual void on_key_typed_function(SDL_Scancode, SDL_Keycode) override {}
+		virtual void on_key_released_function(SDL_Scancode, SDL_Keycode) override {}
 		virtual void draw_function(SDL_Renderer*render, bool mouse_hovering) override;
 
 		std::string_view title;
@@ -721,18 +752,204 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 
 	/*
 	 * Provides a single-line text edit.
+	 * Put an extra advance at the top and at the left of the region specified.
 	 */
 	class TextEdit : public Widget {
 	private:
 		constexpr static SDL_Color BORDER_UNFOCUSED_COLOR = {100, 100, 100, 255};
-		constexpr static SDL_Color BORDER_FOCUSED_COLOR = {220, 230, 250, 255};
+		constexpr static SDL_Color BORDER_FOCUSED_COLOR = {150, 170, 200, 255};
+		constexpr static SDL_Color CURSOR_COLOR = {0, 10, 0, 255};
+		constexpr static Area FONT_EXTRA_ADVANCE = Font::DEFAULT_EXTRA_ADVANCE;
+		constexpr static Uint64 CURSOR_FLASHING_DELAY = 500;
 	public:
-		TextEdit(URect region, const Font &font_) : Widget(region), cursor_position(0), font(font_) {}
+		constexpr static uint_type RECOMMENDED_HEIGHT = FONT_EXTRA_ADVANCE.h + Font::CHARACTER_SIZE.h;
+
+		TextEdit(URect region, const Font &font_) :
+			Widget(region), cursor_position(0), viewport_position(0), focused(false), tick(0), font(font_) {}
+		TextEdit(URect region, const Font &font_, std::string content) :
+			Widget(region), m_content(std::move(content)), cursor_position(0), viewport_position(0), focused(false), tick(0), font(font_) {}
+
+		const std::string &content() const {return m_content;}
+		void set_content(string_view str) {
+			m_content = str;
+			cursor_position = 0;
+			m_calculate_viewport();
+		}
 	private:
-		std::string content;
-		uint_type cursor_position;
+		virtual void on_click_function(UCoord);
+		virtual void on_click_outside_function() {focused = false;}
+		virtual void on_mouse_move_on_function(UCoord) {}
+		virtual void on_mouse_move_out_function() {}
+		virtual void on_key_pressed_function(SDL_Scancode, SDL_Keycode k) {m_key_pressed(k);}
+		virtual void on_key_typed_function(SDL_Scancode, SDL_Keycode k) {m_key_pressed(k);}
+		virtual void on_key_released_function(SDL_Scancode, SDL_Keycode) {}
+		virtual void draw_function(SDL_Renderer *, bool);
+
+		void m_key_pressed(SDL_Keycode key);
+
+		void m_calculate_viewport();
+		/*
+		 * Test whether a keycode is a printable character.
+		 */
+		std::pair<bool, char> m_printable_character(SDL_Keycode);
+
+		std::string m_content;
+		uint_type cursor_position, viewport_position;
+		bool focused;
+		Uint64 tick; // Used to render flashing cursor.
 		const Font &font;
 	};
+
+	void TextEdit::on_click_function(UCoord mouse_coord) {
+		focused = true;
+
+		if(mouse_coord.y < FONT_EXTRA_ADVANCE.h + Font::CHARACTER_SIZE.h) {
+			uint_type pos = mouse_coord.x / (FONT_EXTRA_ADVANCE.w + Font::CHARACTER_SIZE.w);
+			uint_type mod = mouse_coord.x % (FONT_EXTRA_ADVANCE.w + Font::CHARACTER_SIZE.w);
+			if(mod >= (FONT_EXTRA_ADVANCE.w + Font::CHARACTER_SIZE.w) / 2) {
+				cursor_position = pos + 1;
+			} else {
+				cursor_position = pos;
+			}
+			if(cursor_position > m_content.size()) cursor_position = m_content.size();
+		}
+	}
+	void TextEdit::m_key_pressed(SDL_Keycode key) {
+		if(!focused) return;
+		if(key == SDLK_RIGHT || key == SDLK_LEFT || key == SDLK_HOME || key == SDLK_END) { // Control the cursor position.
+			switch(key) {
+				case SDLK_LEFT:
+					if(cursor_position > 0) --cursor_position;
+					break;
+				case SDLK_RIGHT:
+					if(cursor_position < m_content.size()) ++cursor_position;
+					break;
+				case SDLK_HOME:
+					cursor_position = 0;
+					break;
+				case SDLK_END:
+					cursor_position = m_content.size();
+					break;
+			}
+			m_calculate_viewport();
+			tick = SDL_GetTicks64(); // Avoid key flashing when moving the cursor.
+			return;
+		}
+		if(key == SDLK_BACKSPACE) {
+			if(cursor_position != 0) {
+				m_content.erase(cursor_position - 1, 1);
+				--cursor_position;
+				m_calculate_viewport();
+			}
+			return;
+		}
+		if(key == SDLK_DELETE) {
+			if(cursor_position != m_content.size()) {
+				m_content.erase(cursor_position, 1);
+			}
+			return;
+		}
+		std::pair<bool, char> result = m_printable_character(key);
+		if(result.first) {
+			m_content.insert(m_content.begin() + cursor_position, result.second);
+			++cursor_position;
+			m_calculate_viewport();
+			return;
+		}
+		if(key == SDLK_RETURN) {
+			focused = false;
+			cursor_position = 0;
+			m_calculate_viewport();
+		}
+	}
+
+	void TextEdit::m_calculate_viewport() {
+		const uint_type MAX_DISPLAYABLE_CHARACTERS = region.area.w / (FONT_EXTRA_ADVANCE.w + Font::CHARACTER_SIZE.w);
+
+		if(viewport_position > cursor_position || viewport_position + MAX_DISPLAYABLE_CHARACTERS < cursor_position) {
+			viewport_position = cursor_position - MAX_DISPLAYABLE_CHARACTERS / 2;
+			if(viewport_position > m_content.size()) {
+				viewport_position = 0;
+			}
+		}
+	}
+
+	std::pair<bool, char> TextEdit::m_printable_character(SDL_Keycode keycode) {
+		switch(keycode) {
+			case SDLK_0: case SDLK_KP_0: return {true, '0'};
+			case SDLK_1: case SDLK_KP_1: return {true, '1'};
+			case SDLK_2: case SDLK_KP_2: return {true, '2'};
+			case SDLK_3: case SDLK_KP_3: return {true, '3'};
+			case SDLK_4: case SDLK_KP_4: return {true, '4'};
+			case SDLK_5: case SDLK_KP_5: return {true, '5'};
+			case SDLK_6: case SDLK_KP_6: return {true, '6'};
+			case SDLK_7: case SDLK_KP_7: return {true, '7'};
+			case SDLK_8: case SDLK_KP_8: return {true, '8'};
+			case SDLK_9: case SDLK_KP_9: return {true, '9'};
+			case SDLK_a: return {true, 'A'};
+			case SDLK_b: return {true, 'B'};
+			case SDLK_c: return {true, 'C'};
+			case SDLK_d: return {true, 'D'};
+			case SDLK_e: return {true, 'E'};
+			case SDLK_f: return {true, 'F'};
+			case SDLK_g: return {true, 'G'};
+			case SDLK_h: return {true, 'H'};
+			case SDLK_i: return {true, 'I'};
+			case SDLK_j: return {true, 'J'};
+			case SDLK_k: return {true, 'K'};
+			case SDLK_l: return {true, 'L'};
+			case SDLK_m: return {true, 'M'};
+			case SDLK_n: return {true, 'N'};
+			case SDLK_o: return {true, 'O'};
+			case SDLK_p: return {true, 'P'};
+			case SDLK_q: return {true, 'Q'};
+			case SDLK_r: return {true, 'R'};
+			case SDLK_s: return {true, 'S'};
+			case SDLK_t: return {true, 'T'};
+			case SDLK_u: return {true, 'U'};
+			case SDLK_v: return {true, 'V'};
+			case SDLK_w: return {true, 'W'};
+			case SDLK_x: return {true, 'X'};
+			case SDLK_y: return {true, 'Y'};
+			case SDLK_z: return {true, 'Z'};
+			case SDLK_SPACE: return{true, ' '};
+			case SDLK_PERIOD: return{true, '.'};
+		}
+		return {false, 0};
+	}
+
+	void TextEdit::draw_function(SDL_Renderer *render, bool) {
+		if(focused) {
+			SDL_SetRenderDrawColor(render, BORDER_FOCUSED_COLOR.r, BORDER_FOCUSED_COLOR.g, BORDER_FOCUSED_COLOR.b, BORDER_FOCUSED_COLOR.a);
+		} else {
+			SDL_SetRenderDrawColor(render,
+					BORDER_UNFOCUSED_COLOR.r, BORDER_UNFOCUSED_COLOR.g, BORDER_UNFOCUSED_COLOR.b, BORDER_UNFOCUSED_COLOR.a);
+		}
+		SDL_Rect rect = region;
+		SDL_RenderDrawRect(render, &rect);
+		if(viewport_position == 0) {
+			font.render_text(render, m_content, {FONT_EXTRA_ADVANCE.w, FONT_EXTRA_ADVANCE.h});
+		} else {
+			font.render_text(render, string_view(m_content.c_str() + viewport_position), {FONT_EXTRA_ADVANCE.w, FONT_EXTRA_ADVANCE.h});
+		}
+		{
+			URect coord_rect = {
+				{
+					(cursor_position - viewport_position) * (Font::CHARACTER_SIZE.w + FONT_EXTRA_ADVANCE.w), FONT_EXTRA_ADVANCE.h
+				}, {(Font::CHARACTER_SIZE.w + FONT_EXTRA_ADVANCE.w) / 10, Font::CHARACTER_SIZE.h}
+			};
+			rect = coord_rect;
+		}
+		Uint64 now_tick = SDL_GetTicks64();
+		if((now_tick - tick) <= CURSOR_FLASHING_DELAY) {
+			if(focused) {
+				SDL_SetRenderDrawColor(render, CURSOR_COLOR.r, CURSOR_COLOR.g, CURSOR_COLOR.b, CURSOR_COLOR.a);
+				SDL_RenderFillRect(render, &rect);
+			}
+		} else if((now_tick - tick) >= CURSOR_FLASHING_DELAY * 2) {
+			tick = now_tick;
+		}
+	}
 
 	class Chessboard : public Widget {
 		constexpr static Area CHESSMAN_AREA = { (BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH) * 3 / 4,
@@ -744,6 +961,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		void reset();
 
 		URect &get_region() {return region;}
+		CoreGame &get_game() {return game;}
 	private:
 		/*
 		 * Calculate the actual coord of chessman on the screen, according to the coord of chessman on the map.
@@ -762,8 +980,13 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		virtual void on_mouse_move_on_function(UCoord mouse_coord) override;
 		virtual void on_mouse_move_out_function() override;
 		virtual void on_click_function(UCoord mouse_coord) override;
-		virtual void draw_function(SDL_Renderer *render, bool mouse_hovering) override;
 		virtual void on_click_outside_function() override {}
+		virtual void on_key_pressed_function(SDL_Scancode, SDL_Keycode k) override {m_key_pressed(k);}
+		virtual void on_key_typed_function(SDL_Scancode, SDL_Keycode k) override {m_key_pressed(k);}
+		virtual void on_key_released_function(SDL_Scancode, SDL_Keycode) override {}
+		virtual void draw_function(SDL_Renderer *render, bool mouse_hovering) override;
+
+		void m_key_pressed(SDL_Keycode);
 
 		bool is_selecting_chessman;
 		UCoord coord_of_chessman_selecting;
@@ -852,6 +1075,31 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 			if(game[coord_of_chessman_selecting] == CoreGame::Unit::EMPTY && game.status() == CoreGame::Status::NONE) {
 				game.place(coord_of_chessman_selecting);
 			}
+		}
+	}
+	void Chessboard::m_key_pressed(SDL_Keycode key) {
+		if(!is_selecting_chessman) {
+			coord_of_chessman_selecting = {map_size.w / 2, map_size.h / 2};
+			is_selecting_chessman = true;
+		}
+		switch(key) {
+			case SDLK_UP:
+				if(coord_of_chessman_selecting.y > 0) --coord_of_chessman_selecting.y;
+				break;
+			case SDLK_DOWN:
+				if(coord_of_chessman_selecting.y < map_size.h - 1) ++coord_of_chessman_selecting.y;
+				break;
+			case SDLK_LEFT:
+				if(coord_of_chessman_selecting.x > 0) --coord_of_chessman_selecting.x;
+				break;
+			case SDLK_RIGHT:
+				if(coord_of_chessman_selecting.x < map_size.w - 1) ++coord_of_chessman_selecting.x;
+				break;
+			case SDLK_RETURN: case SDLK_SPACE:
+				if(game[coord_of_chessman_selecting] == CoreGame::Unit::EMPTY) {
+					game.place(coord_of_chessman_selecting);
+				}
+				break;
 		}
 	}
 	void Chessboard::draw_function(SDL_Renderer *render, bool /* mouse_hovering */) {
@@ -972,11 +1220,13 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 	private:
 		SDL_Window *window;
 		SDL_Renderer *render;
-		Font *font;
+		unique_ptr<Font> font;
 
-		Button *reset_button, *exit_button;
-		Chessboard *chessboard;
-		WidgetManager *widget_manager;
+		unique_ptr<Button> reset_button, exit_button;
+		unique_ptr<TextEdit> textedit;
+		unique_ptr<Chessboard> chessboard;
+
+		unique_ptr<WidgetManager> widget_manager;
 
 		bool request_stop;
 	};
@@ -992,7 +1242,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 					SDL_WINDOWPOS_UNDEFINED,
 					window_size.w,
 					window_size.h,
-					SDL_WINDOW_SHOWN);
+					SDL_WINDOW_HIDDEN);
 		if(!window) {
 			log_error("Error occurred creating the main window: %s.", SDL_GetError());
 			exit(1);
@@ -1023,75 +1273,53 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 		}
 		SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
 
-		font = new Font(screen->format, render, {0x20, 0x20, 0x20, 0xFF});
+		font.reset(new Font(screen->format, render, {0x20, 0x20, 0x20, 0xFF}));
 
 
 		// Setting up widgets
-		widget_manager = new WidgetManager(render);
+		widget_manager.reset(new WidgetManager(render));
 
 		constexpr Area reset_area = Font::text_size("reset");
-		reset_button = new Button(*font, "reset", {
+		reset_button.reset(new Button(*font, "reset", {
 			{ DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w,
 				background_blank_outof_map_size.h * 4 / 3 + real_map_size.h },
 			{ reset_area.w, reset_area.h }
-		});
+		}));
 		reset_button->set_on_click([this] (UCoord) {
 			chessboard->reset();
 		});
 		widget_manager->register_widget(*reset_button);
 
 		constexpr Area exit_area = Font::text_size("exit");
-		exit_button = new Button(*font, "exit", {
+		exit_button.reset(new Button(*font, "exit", {
 			{ window_size.w - DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w - exit_area.w,
 				background_blank_outof_map_size.h * 4 / 3 + real_map_size.h },
 			{exit_area.w, exit_area.h}
-		});
+		}));
 		exit_button->set_on_click([this](UCoord) {
 			request_stop = true;
 		});
 		widget_manager->register_widget(*exit_button);
 
-		chessboard = new Chessboard(render, screen->format, background_blank_outof_map_size);
+		textedit.reset(new TextEdit({{0, 0}, {window_size.w, TextEdit::RECOMMENDED_HEIGHT}}, *font));
+		widget_manager->register_widget(*textedit);
+
+		chessboard.reset(new Chessboard(render, screen->format, background_blank_outof_map_size));
 		widget_manager->register_widget(*chessboard);
 	}
 
 	Game::~Game() {
-		delete reset_button;
-		delete exit_button;
-		delete chessboard;
-		delete widget_manager;
-		delete font;
-
 		SDL_DestroyRenderer(render);
 		SDL_DestroyWindow(window);
 		SDL_Quit();
 	}
 
 	void Game::start() {
-		Uint64 trick_helper= 0; //ONLY FOR TRICK
+		SDL_ShowWindow(window);
+		Uint64 trick_helper = 0; //ONLY FOR TRICK
 		while(!request_stop) {
 			SDL_SetRenderDrawColor(render, BACKGROUND_COLOR.r, BACKGROUND_COLOR.g, BACKGROUND_COLOR.b, 255);
 			SDL_RenderClear(render);
-
-			UCoord mouse_coord; // Get mouse state.
-			{
-				int x, y;
-				SDL_GetMouseState(&x, &y);
-				mouse_coord.x = x;
-				mouse_coord.y = y;
-			}
-
-			bool mouse_down = false; // Handle events.
-			SDL_Event event;
-			while(SDL_PollEvent(&event)) {
-				switch(event.type) {
-					case SDL_QUIT:
-						return;
-					case SDL_MOUSEBUTTONDOWN:
-						mouse_down = true;
-						break;
-				}
-			}
 
 			if (enable_trick) {
 				chessboard->get_region().coord.x = background_blank_outof_map_size.w * (sin(SDL_GetTicks64() * M_PI / 5 / 180) + 1);
@@ -1101,10 +1329,40 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2 and SDL2_g
 				}
 			}
 
-			widget_manager->mouse_move(mouse_coord);
-			if(mouse_down) {
-				widget_manager->mouse_button_down(mouse_coord);
+			bool mouse_down = false; // Handle events.
+			bool mouse_move = false;
+			SDL_Event event;
+			while(SDL_PollEvent(&event)) {
+				switch(event.type) {
+					case SDL_QUIT:
+						return;
+					case SDL_MOUSEMOTION:
+						mouse_move = true;
+						break;
+					case SDL_MOUSEBUTTONDOWN:
+						mouse_down = true;
+						break;
+					case SDL_KEYDOWN: case SDL_KEYUP:
+						widget_manager->keyboard_event(event.key);
+						break;
+				}
 			}
+
+			UCoord mouse_coord; // Get mouse state.
+			{
+				int x, y;
+				SDL_GetMouseState(&x, &y);
+				mouse_coord.x = x;
+				mouse_coord.y = y;
+			}
+
+			CoreGame &game = chessboard->get_game();
+			if(game.status() != CoreGame::Status::NONE) {
+				textedit->set_content(game.status() == CoreGame::Status::WHITE_WON ? "White won!" : "Black won!");
+			}
+
+			if(mouse_move) widget_manager->mouse_move(mouse_coord);
+			if(mouse_down) widget_manager->mouse_button_down(mouse_coord);
 			widget_manager->draw();
 
 			if(software_rendering) {
@@ -1267,7 +1525,7 @@ namespace frontend_with_console {
 		ArrowKeyPraser praser;
 		while(true) {
 			unsigned char input = getch();
-			Key key = Key::UP; //Why is this defaultly set with Key::UP? to AVOID STUPID WARNING FROM GCC ONCE AGAIN
+			Key key = Key::UP; //Why is this initialized with Key::UP? to AVOID STUPID WARNING FROM GCC ONCE AGAIN
 			auto praser_result = praser(input);
 			switch(praser_result.first) {
 				case ArrowKeyPraser::Status::MATCH:
