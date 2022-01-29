@@ -758,7 +758,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 	private:
 		constexpr static SDL_Color BORDER_UNFOCUSED_COLOR = {100, 100, 100, 255};
 		constexpr static SDL_Color BORDER_FOCUSED_COLOR = {150, 170, 200, 255};
-		constexpr static SDL_Color CURSOR_COLOR = {0, 10, 0, 255};
+		constexpr static SDL_Color CURSOR_COLOR = {0, 0, 0, 255};
 		constexpr static Area FONT_EXTRA_ADVANCE = Font::DEFAULT_EXTRA_ADVANCE;
 		constexpr static Uint64 CURSOR_FLASHING_DELAY = 500;
 	public:
