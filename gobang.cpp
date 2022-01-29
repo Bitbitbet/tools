@@ -1,3 +1,4 @@
+#include <SDL2/SDL_events.h>
 #include <memory>
 #include <vector>
 #include <iostream>
@@ -570,7 +571,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 	class Widget {
 		friend class WidgetManager;
 	public:
-		Widget();
+		Widget() = default;
 		Widget(URect r) : region(r) {}
 		virtual ~Widget() {}
 		Widget(const Widget &w) : region(w.region) {}
@@ -591,7 +592,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		 * Should be called when a mouse hovers on the widget.
 		 * Requires the relative position of mouse.
 		 */
-		void on_mouse_move_on(UCoord c) {on_mouse_move_on_function(c);}
+		void on_mouse_move_on(UCoord c, bool mouse_position_changed) {on_mouse_move_on_function(c, mouse_position_changed);}
 
 		void on_mouse_move_out() {on_mouse_move_out_function();}
 
@@ -606,7 +607,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 
 		virtual void on_click_function(UCoord) = 0;
 		virtual void on_click_outside_function() = 0;
-		virtual void on_mouse_move_on_function(UCoord) = 0;
+		virtual void on_mouse_move_on_function(UCoord, bool) = 0;
 		virtual void on_mouse_move_out_function() = 0;
 		virtual void on_key_pressed_function(SDL_Scancode, SDL_Keycode) = 0;
 		virtual void on_key_typed_function(SDL_Scancode, SDL_Keycode) = 0;
@@ -629,22 +630,28 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		void draw();
 
 		/*
-		 * Should be called when a mouse click event arises.
-		 * Return whether a widget captures the event.
+		 * This function will call SDL_PollEvent.
 		 */
-		bool mouse_button_down(UCoord mouse_coord);
-
-		void mouse_move(UCoord mouse_coord);
-
-		/*
-		 * Note that this function will send the keyboard event to all widgets.
-		 */
-		void keyboard_event(SDL_KeyboardEvent event);
+		void handle_events();
 	private:
 		struct WidgetNode {
 			Widget &widget;
 			bool mouse_hovering;
 		};
+
+		/*
+		 * Should be called when a mouse click event arises.
+		 * Return whether a widget captures the event.
+		 */
+		bool mouse_button_down(UCoord mouse_coord);
+
+		void mouse_move(UCoord mouse_coord, bool mouse_position_changed);
+
+		/*
+		 * Note that this function will send the keyboard event to all widgets.
+		 */
+		void keyboard_event(SDL_KeyboardEvent event);
+
 		std::vector<WidgetNode> widgets;
 		SDL_Renderer *render;
 	};
@@ -656,6 +663,40 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 			widget_node.widget.draw(render, widget_node.mouse_hovering);
 		}
 		SDL_RenderSetViewport(render, nullptr);
+	}
+	void WidgetManager::handle_events() {
+			bool is_mouse_pressed = false; // Handle events.
+			bool is_mouse_moved = false;
+			SDL_Event event;
+			while(SDL_PollEvent(&event)) {
+				switch(event.type) {
+					case SDL_MOUSEMOTION:
+						is_mouse_moved = true;
+						break;
+					case SDL_MOUSEBUTTONDOWN:
+						is_mouse_pressed = true;
+						break;
+					case SDL_KEYDOWN: case SDL_KEYUP:
+						keyboard_event(event.key);
+						break;
+					default:
+						SDL_PushEvent(&event);
+				}
+			}
+
+			UCoord mouse_coord; // Get mouse state.
+			{
+				int x, y;
+				SDL_GetMouseState(&x, &y);
+				mouse_coord.x = x;
+				mouse_coord.y = y;
+			}
+			if(is_mouse_moved) {
+				mouse_move(mouse_coord, true);
+			} else {
+				mouse_move(mouse_coord, false);
+			}
+			if(is_mouse_pressed) mouse_button_down(mouse_coord);
 	}
 	bool WidgetManager::mouse_button_down(UCoord c) {
 		bool captured = false; // used to record whether the click event is already captured by a widget.
@@ -670,12 +711,12 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		}
 		return captured;
 	}
-	void WidgetManager::mouse_move(UCoord c) {
+	void WidgetManager::mouse_move(UCoord c, bool mouse_position_changed) {
 		for(WidgetNode &widget_node: widgets) {
 			if(ucoord_in_rect(c, widget_node.widget.region)) {
 				widget_node.mouse_hovering = true;
 				UCoord coord = widget_node.widget.region.coord;
-				widget_node.widget.on_mouse_move_on({c.x - coord.x, c.y - coord.y});
+				widget_node.widget.on_mouse_move_on({c.x - coord.x, c.y - coord.y}, mouse_position_changed);
 			} else {
 				if(widget_node.mouse_hovering) {
 					widget_node.mouse_hovering = false;
@@ -722,7 +763,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		}
 
 		virtual void on_click_outside_function() override {}
-		virtual void on_mouse_move_on_function(UCoord) override {}
+		virtual void on_mouse_move_on_function(UCoord, bool) override {}
 		virtual void on_mouse_move_out_function() override {}
 		virtual void on_key_pressed_function(SDL_Scancode, SDL_Keycode) override {}
 		virtual void on_key_typed_function(SDL_Scancode, SDL_Keycode) override {}
@@ -778,7 +819,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 	private:
 		virtual void on_click_function(UCoord);
 		virtual void on_click_outside_function() {focused = false;}
-		virtual void on_mouse_move_on_function(UCoord) {}
+		virtual void on_mouse_move_on_function(UCoord, bool) {}
 		virtual void on_mouse_move_out_function() {}
 		virtual void on_key_pressed_function(SDL_Scancode, SDL_Keycode k) {m_key_pressed(k);}
 		virtual void on_key_typed_function(SDL_Scancode, SDL_Keycode k) {m_key_pressed(k);}
@@ -958,6 +999,50 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		}
 	}
 
+	class TextField : public Widget {
+	private:
+		constexpr static Area FONT_EXTRA_ADVANCE = Font::DEFAULT_EXTRA_ADVANCE;
+	public:
+		constexpr static uint_type RECOMMENDED_HEIGHT = Font::CHARACTER_SIZE.h;
+
+		TextField(const Font &font_) : font(font_) {}
+
+		void set_content(string_view str) {
+			m_content = str;
+			if(str.size() == 0) {
+				region.area.w = 0;
+				region.area.h = 0;
+			} else {
+				region.area.w = str.size() * (Font::CHARACTER_SIZE.w + FONT_EXTRA_ADVANCE.w) - FONT_EXTRA_ADVANCE.w;
+				region.area.h = Font::CHARACTER_SIZE.h;
+			}
+		}
+
+		void set_coord(UCoord c) {region.coord = c;}
+		void set_central_coord_x(uint_type x) {
+			region.coord.x = x - region.area.w / 2;
+		}
+		void set_central_coord(UCoord c) {
+			region.coord = { c.x - region.area.w / 2, c.y - region.area.h / 2 };
+		}
+	private:
+		virtual void on_click_function(UCoord) {}
+		virtual void on_click_outside_function() {}
+		virtual void on_mouse_move_on_function(UCoord, bool) {}
+		virtual void on_mouse_move_out_function() {}
+		virtual void on_key_pressed_function(SDL_Scancode, SDL_Keycode) {}
+		virtual void on_key_typed_function(SDL_Scancode, SDL_Keycode) {}
+		virtual void on_key_released_function(SDL_Scancode, SDL_Keycode) {}
+		virtual void draw_function(SDL_Renderer *, bool);
+
+		std::string m_content;
+		
+		const Font &font;
+	};
+	void TextField::draw_function(SDL_Renderer *render, bool) {
+		font.render_text(render, m_content, {0, 0});
+	}
+
 	class Chessboard : public Widget {
 		constexpr static Area CHESSMAN_AREA = { (BACKGROUND_BLANK_BETWEEN_LINES_SIZE.w + BACKGROUND_LINE_WIDTH) * 3 / 4,
 				(BACKGROUND_BLANK_BETWEEN_LINES_SIZE.h + BACKGROUND_LINE_WIDTH) * 3 / 4 };
@@ -984,7 +1069,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		 */
 		static SDL_Surface *generate_background_surface(SDL_PixelFormat *format);
 
-		virtual void on_mouse_move_on_function(UCoord mouse_coord) override;
+		virtual void on_mouse_move_on_function(UCoord mouse_coord, bool mouse_position_changed) override;
 		virtual void on_mouse_move_out_function() override;
 		virtual void on_click_function(UCoord mouse_coord) override;
 		virtual void on_click_outside_function() override {}
@@ -1020,7 +1105,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		SDL_FillRect(sur, nullptr, SDL_MapRGBA(sur->format, 255, 255, 255, 0));
 		SDL_Renderer *sur_render = SDL_CreateSoftwareRenderer(sur);
 
-		constexpr uint_type RADIUS = CHESSMAN_AREA.w > CHESSMAN_AREA.h ? CHESSMAN_AREA.h : CHESSMAN_AREA.w;
+		constexpr uint_type RADIUS = (CHESSMAN_AREA.w > CHESSMAN_AREA.h ? CHESSMAN_AREA.h : CHESSMAN_AREA.w) / 2;
 
 		// BLACK CHESSMAN TEXTURE
 		SDL_SetRenderDrawColor(sur_render, BLACK_CHESSMAN_COLOR.r,
@@ -1061,7 +1146,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		game.clear();
 		is_selecting_chessman = false;
 	}
-	void Chessboard::on_mouse_move_on_function(UCoord mouse_coord) {
+	void Chessboard::on_mouse_move_on_function(UCoord mouse_coord, bool) {
 		m_select_chessman(mouse_coord);
 	}
 	void Chessboard::on_mouse_move_out_function() {
@@ -1222,7 +1307,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		unique_ptr<Font> font;
 
 		unique_ptr<Button> reset_button, exit_button;
-		unique_ptr<TextEdit> textedit;
+		unique_ptr<TextField> textfield;
 		unique_ptr<Chessboard> chessboard;
 
 		unique_ptr<WidgetManager> widget_manager;
@@ -1300,8 +1385,9 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		});
 		widget_manager->register_widget(*exit_button);
 
-		textedit.reset(new TextEdit({{0, 0}, {window_size.w, TextEdit::RECOMMENDED_HEIGHT}}, *font));
-		widget_manager->register_widget(*textedit);
+		textfield.reset(new TextField(*font));
+		textfield->set_coord({0, background_blank_outof_map_size.h / 3});
+		widget_manager->register_widget(*textfield);
 
 		chessboard.reset(new Chessboard(render, screen->format, background_blank_outof_map_size));
 		widget_manager->register_widget(*chessboard);
@@ -1328,40 +1414,25 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 				}
 			}
 
-			bool mouse_down = false; // Handle events.
-			bool mouse_move = false;
-			SDL_Event event;
-			while(SDL_PollEvent(&event)) {
-				switch(event.type) {
-					case SDL_QUIT:
-						return;
-					case SDL_MOUSEMOTION:
-						mouse_move = true;
-						break;
-					case SDL_MOUSEBUTTONDOWN:
-						mouse_down = true;
-						break;
-					case SDL_KEYDOWN: case SDL_KEYUP:
-						widget_manager->keyboard_event(event.key);
-						break;
-				}
-			}
-
-			UCoord mouse_coord; // Get mouse state.
-			{
-				int x, y;
-				SDL_GetMouseState(&x, &y);
-				mouse_coord.x = x;
-				mouse_coord.y = y;
-			}
 
 			CoreGame &game = chessboard->get_game();
-			if(game.status() != CoreGame::Status::NONE) {
-				textedit->set_content(game.status() == CoreGame::Status::WHITE_WON ? "White won!" : "Black won!");
+			if(game.status() == CoreGame::Status::NONE) {
+				textfield->set_content(game.is_white_turn() ? "White's turn" : "Black's turn");
+			} else {
+				textfield->set_content(game.status() == CoreGame::Status::WHITE_WON ? "White won!" : "Black won!");
 			}
+			textfield->set_central_coord_x(window_size.w / 2);
 
-			if(mouse_move) widget_manager->mouse_move(mouse_coord);
-			if(mouse_down) widget_manager->mouse_button_down(mouse_coord);
+			widget_manager->handle_events();
+			{
+				SDL_Event event;
+				while(SDL_PollEvent(&event)) {
+					switch(event.type) {
+						case SDL_QUIT:
+							return;
+					}
+				}
+			}
 			widget_manager->draw();
 
 			if(software_rendering) {
