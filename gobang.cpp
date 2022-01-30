@@ -1,4 +1,3 @@
-#include <SDL2/SDL_events.h>
 #include <memory>
 #include <vector>
 #include <iostream>
@@ -1018,6 +1017,8 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 			}
 		}
 
+		const std::string &content() const {return m_content;}
+
 		void set_coord(UCoord c) {region.coord = c;}
 		void set_central_coord_x(uint_type x) {
 			region.coord.x = x - region.area.w / 2;
@@ -1294,6 +1295,10 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 	 * Frontend with SDL2.
 	 */
         class Game {
+	private:
+		enum class Status : uint8_t {
+			MAINMENU = 0, OFFLINE_GAMING
+		};
 	public:
 		Game();
 		~Game();
@@ -1302,20 +1307,30 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 
 		void start();
 	private:
+		void mainmenu_logic();
+		void offline_gaming_logic();
+
 		SDL_Window *window;
 		SDL_Renderer *render;
 		unique_ptr<Font> font;
+		Status status;
 
-		unique_ptr<Button> reset_button, exit_button;
-		unique_ptr<TextField> textfield;
+		unique_ptr<WidgetManager> mainmenu_widgets;
+		unique_ptr<WidgetManager> offline_gaming_widgets;
+
+		unique_ptr<TextField> title_textfield; // Widgets for mainmenu
+		unique_ptr<Button> start_button, exit_button;
+
+		unique_ptr<Button> reset_button, back_button; // Widgets for offline gaming
+		unique_ptr<TextField> chessboard_textfield;
 		unique_ptr<Chessboard> chessboard;
 
-		unique_ptr<WidgetManager> widget_manager;
-
 		bool request_stop;
+
+		Uint64 trick_helper; //ONLY FOR TRICK
 	};
 
-	Game::Game() : request_stop(false) {
+	Game::Game() : status(Status::MAINMENU), request_stop(false) {
 		// Initialize SDL2
 		if(SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO) < 0) {
 			log_error("Error initializing SDL2: %s.", SDL_GetError());
@@ -1361,69 +1376,128 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 
 
 		// Setting up widgets
-		widget_manager.reset(new WidgetManager(render));
+		mainmenu_widgets.reset(new WidgetManager(render));
+
+		constexpr Area start_area = Font::text_size("start");
+		start_button.reset(new Button(*font, "start", {{window_size.w / 2 - start_area.w / 2, window_size.h * 6 / 10}, start_area}));
+		start_button->set_on_click([this](UCoord) {
+			chessboard->reset();
+			status = Status::OFFLINE_GAMING;
+		});
+		mainmenu_widgets->register_widget(*start_button);
+
+		constexpr Area exit_area = Font::text_size("exit");
+		exit_button.reset(new Button(*font, "exit", {{window_size.w / 2 - exit_area.w / 2, window_size.h * 7 / 10}, exit_area}));
+		exit_button->set_on_click([this](UCoord) {
+			request_stop = true;
+		});
+		mainmenu_widgets->register_widget(*exit_button);
+
+		title_textfield.reset(new TextField(*font));
+		title_textfield->set_content("gobang");
+		title_textfield->set_central_coord({window_size.w / 2, window_size.h * 2 / 10});
+		mainmenu_widgets->register_widget(*title_textfield);
+
+
+
+		offline_gaming_widgets.reset(new WidgetManager(render));
 
 		constexpr Area reset_area = Font::text_size("reset");
 		reset_button.reset(new Button(*font, "reset", {
 			{ DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w,
 				background_blank_outof_map_size.h * 4 / 3 + real_map_size.h },
-			{ reset_area.w, reset_area.h }
+			reset_area
 		}));
 		reset_button->set_on_click([this] (UCoord) {
 			chessboard->reset();
 		});
-		widget_manager->register_widget(*reset_button);
+		offline_gaming_widgets->register_widget(*reset_button);
 
-		constexpr Area exit_area = Font::text_size("exit");
-		exit_button.reset(new Button(*font, "exit", {
+		constexpr Area back_area = Font::text_size("back");
+		back_button.reset(new Button(*font, "back", {
 			{ window_size.w - DEFAULT_BACKGROUND_BLANK_OUTOF_MAP_SIZE.w - exit_area.w,
 				background_blank_outof_map_size.h * 4 / 3 + real_map_size.h },
-			{exit_area.w, exit_area.h}
+			back_area
 		}));
-		exit_button->set_on_click([this](UCoord) {
-			request_stop = true;
+		back_button->set_on_click([this](UCoord) {
+			status = Status::MAINMENU;
 		});
-		widget_manager->register_widget(*exit_button);
+		offline_gaming_widgets->register_widget(*back_button);
 
-		textfield.reset(new TextField(*font));
-		textfield->set_coord({0, background_blank_outof_map_size.h / 3});
-		widget_manager->register_widget(*textfield);
+		chessboard_textfield.reset(new TextField(*font));
+		chessboard_textfield->set_coord({0, background_blank_outof_map_size.h / 3});
+		offline_gaming_widgets->register_widget(*chessboard_textfield);
 
 		chessboard.reset(new Chessboard(render, screen->format, background_blank_outof_map_size));
-		widget_manager->register_widget(*chessboard);
+		offline_gaming_widgets->register_widget(*chessboard);
 	}
 
 	Game::~Game() {
+		mainmenu_widgets.reset();
+		offline_gaming_widgets.reset();
+
+		title_textfield.reset();
+		start_button.reset();
+		exit_button.reset();
+		reset_button.reset();
+		back_button.reset();
+		chessboard_textfield.reset();
+		chessboard.reset();
+
+		font.reset();
+
 		SDL_DestroyRenderer(render);
 		SDL_DestroyWindow(window);
 		SDL_Quit();
 	}
 
+	void Game::mainmenu_logic() {
+		if(enable_trick) {
+			if(SDL_GetTicks64() - trick_helper >= 500) {
+				std::swap(start_button->get_region().coord, exit_button->get_region().coord);
+				trick_helper = SDL_GetTicks64();
+			}
+		}
+		mainmenu_widgets->handle_events();
+		mainmenu_widgets->draw();
+	}
+
+	void Game::offline_gaming_logic() {
+		if (enable_trick) {
+			chessboard->get_region().coord.x = background_blank_outof_map_size.w * (sin(SDL_GetTicks64() * M_PI / 5 / 180) + 1);
+			if(SDL_GetTicks64() - trick_helper >= 500) {
+				std::swap(back_button->get_region().coord, reset_button->get_region().coord);
+				trick_helper = SDL_GetTicks64();
+			}
+		}
+
+		CoreGame &game = chessboard->get_game();
+		if(game.status() == CoreGame::Status::NONE) {
+			chessboard_textfield->set_content(game.is_white_turn() ? "White's turn" : "Black's turn");
+		} else {
+			chessboard_textfield->set_content(game.status() == CoreGame::Status::WHITE_WON ? "White won!" : "Black won!");
+		}
+		chessboard_textfield->set_central_coord_x(window_size.w / 2);
+
+		offline_gaming_widgets->handle_events();
+		offline_gaming_widgets->draw();
+	}
+
 	void Game::start() {
 		SDL_ShowWindow(window);
-		Uint64 trick_helper = 0; //ONLY FOR TRICK
+		trick_helper = 0;
 		while(!request_stop) {
 			SDL_SetRenderDrawColor(render, BACKGROUND_COLOR.r, BACKGROUND_COLOR.g, BACKGROUND_COLOR.b, 255);
 			SDL_RenderClear(render);
 
-			if (enable_trick) {
-				chessboard->get_region().coord.x = background_blank_outof_map_size.w * (sin(SDL_GetTicks64() * M_PI / 5 / 180) + 1);
-				if(SDL_GetTicks64() - trick_helper >= 500) {
-					std::swap(exit_button->get_region().coord, reset_button->get_region().coord);
-					trick_helper = SDL_GetTicks64();
-				}
+			switch(status) {
+				case Status::MAINMENU:
+					mainmenu_logic();
+					break;
+				case Status::OFFLINE_GAMING:
+					offline_gaming_logic();
+					break;
 			}
-
-
-			CoreGame &game = chessboard->get_game();
-			if(game.status() == CoreGame::Status::NONE) {
-				textfield->set_content(game.is_white_turn() ? "White's turn" : "Black's turn");
-			} else {
-				textfield->set_content(game.status() == CoreGame::Status::WHITE_WON ? "White won!" : "Black won!");
-			}
-			textfield->set_central_coord_x(window_size.w / 2);
-
-			widget_manager->handle_events();
 			{
 				SDL_Event event;
 				while(SDL_PollEvent(&event)) {
@@ -1433,7 +1507,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 					}
 				}
 			}
-			widget_manager->draw();
 
 			if(software_rendering) {
 				SDL_UpdateWindowSurface(window);
