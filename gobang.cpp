@@ -1074,12 +1074,11 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		virtual void on_mouse_move_out_function() override;
 		virtual void on_click_function(UCoord mouse_coord) override;
 		virtual void on_click_outside_function() override {}
-		virtual void on_key_pressed_function(SDL_Scancode, SDL_Keycode k) override {m_key_pressed(k);}
-		virtual void on_key_typed_function(SDL_Scancode, SDL_Keycode k) override {m_key_pressed(k);}
+		virtual void on_key_pressed_function(SDL_Scancode, SDL_Keycode) override {}
+		virtual void on_key_typed_function(SDL_Scancode, SDL_Keycode) override {}
 		virtual void on_key_released_function(SDL_Scancode, SDL_Keycode) override {}
 		virtual void draw_function(SDL_Renderer *render, bool mouse_hovering) override;
 
-		void m_key_pressed(SDL_Keycode);
 		void m_select_chessman(UCoord mouse_coord);
 
 		bool is_selecting_chessman;
@@ -1176,31 +1175,6 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 			}
 		}
 		is_selecting_chessman = false;
-	}
-	void Chessboard::m_key_pressed(SDL_Keycode key) {
-		if(!is_selecting_chessman) {
-			coord_of_chessman_selecting = {map_size.w / 2, map_size.h / 2};
-			is_selecting_chessman = true;
-		}
-		switch(key) {
-			case SDLK_UP:
-				if(coord_of_chessman_selecting.y > 0) --coord_of_chessman_selecting.y;
-				break;
-			case SDLK_DOWN:
-				if(coord_of_chessman_selecting.y < map_size.h - 1) ++coord_of_chessman_selecting.y;
-				break;
-			case SDLK_LEFT:
-				if(coord_of_chessman_selecting.x > 0) --coord_of_chessman_selecting.x;
-				break;
-			case SDLK_RIGHT:
-				if(coord_of_chessman_selecting.x < map_size.w - 1) ++coord_of_chessman_selecting.x;
-				break;
-			case SDLK_RETURN: case SDLK_SPACE:
-				if(game[coord_of_chessman_selecting] == CoreGame::Unit::EMPTY) {
-					game.place(coord_of_chessman_selecting);
-				}
-				break;
-		}
 	}
 	void Chessboard::draw_function(SDL_Renderer *render, bool /* mouse_hovering */) {
 		SDL_RenderCopy(render, background_texture, nullptr, nullptr);
