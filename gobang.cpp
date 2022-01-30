@@ -8,6 +8,7 @@
 #include <thread>
 #include <type_traits>
 
+#include <cmath>
 #include <cstdint>
 #include <cassert>
 #include <cstring>
@@ -272,12 +273,12 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		Area area;
 
 		constexpr operator SDL_Rect() const {
-			SDL_Rect r;
-			r.x = coord.x;
-			r.y = coord.y;
-			r.w = area.w;
-			r.h = area.h;
-			return r;
+			return {
+				static_cast<int>(coord.x),
+				static_cast<int>(coord.y),
+				static_cast<int>(area.w),
+				static_cast<int>(area.h)
+			};
 		}
 	};
 	constexpr inline bool operator==(URect lfs, URect rfs) {
