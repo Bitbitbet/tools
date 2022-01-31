@@ -10,6 +10,7 @@ map <LEADER><F9> <Plug>VimspectorToggleConditionalBreakpoint
 map <F10> <Plug>VimspectorStepOver
 map <LEADER><F10> <Plug>VimspectorStepInto
 map <F12> <Plug>VimspectorStepout
+map <LEADER>r <Plug>VimspectorRunToCursor
 " F3: stop
 " F4: restart
 " F5: start or continue
