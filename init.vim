@@ -278,8 +278,6 @@ noremap <silent> <LEADER>l <C-w>l
 
 
 exec "nohlsearch"
-au BufRead,BufNewFile .zshrc set filetype=sh
-
 au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
 
 
