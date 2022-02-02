@@ -61,6 +61,7 @@ Key key_from_console_key(console::Key k) {
 		case console::Key::LEFT: return Key::LEFT;
 		case console::Key::RIGHT: return Key::RIGHT;
 	}
+	return Key::UP; // avoid warning
 }
 
 constexpr Direction operator!(Direction dir) {
@@ -70,7 +71,7 @@ constexpr Direction operator!(Direction dir) {
 		case Direction::LEFT: return Direction::RIGHT;
 		case Direction::RIGHT: return Direction::LEFT;
 	}
-	return Direction::UP;
+	return Direction::UP; // avoid warning
 }
 
 constexpr size_t BLOCK_SPACE_WIDTH = 2;

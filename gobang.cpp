@@ -629,10 +629,14 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 
 		void draw();
 
+		struct EventResult {
+			bool should_exit;
+		};
 		/*
 		 * This function will call SDL_PollEvent.
+		 * Return some information about the event handled but not processed.
 		 */
-		void handle_events();
+		EventResult handle_events();
 	private:
 		struct WidgetNode {
 			Widget &widget;
@@ -664,39 +668,43 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		}
 		SDL_RenderSetViewport(render, nullptr);
 	}
-	void WidgetManager::handle_events() {
-			bool is_mouse_pressed = false; // Handle events.
-			bool is_mouse_moved = false;
-			SDL_Event event;
-			while(SDL_PollEvent(&event)) {
-				switch(event.type) {
-					case SDL_MOUSEMOTION:
-						is_mouse_moved = true;
-						break;
-					case SDL_MOUSEBUTTONDOWN:
-						is_mouse_pressed = true;
-						break;
-					case SDL_KEYDOWN: case SDL_KEYUP:
-						keyboard_event(event.key);
-						break;
-					default:
-						SDL_PushEvent(&event);
-				}
-			}
+	auto WidgetManager::handle_events() -> EventResult {
+		EventResult event_result = {false};
+		bool is_mouse_pressed = false; // Handle events.
+		bool is_mouse_moved = false;
+		SDL_Event event;
+		while(SDL_PollEvent(&event)) {
+			switch(event.type) {
+				case SDL_MOUSEMOTION:
+					is_mouse_moved = true;
+					break;
+				case SDL_MOUSEBUTTONDOWN:
+					is_mouse_pressed = true;
+					break;
+				case SDL_KEYDOWN: case SDL_KEYUP:
+					keyboard_event(event.key);
+					break;
 
-			UCoord mouse_coord; // Get mouse state.
-			{
-				int x, y;
-				SDL_GetMouseState(&x, &y);
-				mouse_coord.x = x;
-				mouse_coord.y = y;
+				case SDL_QUIT:
+					event_result.should_exit = true;
+					break;
 			}
-			if(is_mouse_moved) {
-				mouse_move(mouse_coord, true);
-			} else {
-				mouse_move(mouse_coord, false);
-			}
-			if(is_mouse_pressed) mouse_button_down(mouse_coord);
+		}
+
+		UCoord mouse_coord; // Get mouse state.
+		{
+			int x, y;
+			SDL_GetMouseState(&x, &y);
+			mouse_coord.x = x;
+			mouse_coord.y = y;
+		}
+		if(is_mouse_moved) {
+			mouse_move(mouse_coord, true);
+		} else {
+			mouse_move(mouse_coord, false);
+		}
+		if(is_mouse_pressed) mouse_button_down(mouse_coord);
+		return event_result;
 	}
 	bool WidgetManager::mouse_button_down(UCoord c) {
 		bool captured = false; // used to record whether the click event is already captured by a widget.
@@ -1433,7 +1441,9 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 				trick_helper = SDL_GetTicks64();
 			}
 		}
-		mainmenu_widgets->handle_events();
+		if(mainmenu_widgets->handle_events().should_exit) {
+			request_stop = true;
+		}
 		mainmenu_widgets->draw();
 	}
 
@@ -1454,7 +1464,9 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		}
 		chessboard_textfield->set_central_coord_x(window_size.w / 2);
 
-		offline_gaming_widgets->handle_events();
+		if(offline_gaming_widgets->handle_events().should_exit) {
+			request_stop = true;
+		}
 		offline_gaming_widgets->draw();
 	}
 
@@ -1473,15 +1485,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 					offline_gaming_logic();
 					break;
 			}
-			{
-				SDL_Event event;
-				while(SDL_PollEvent(&event)) {
-					switch(event.type) {
-						case SDL_QUIT:
-							return;
-					}
-				}
-			}
+			if(request_stop) break; // For SDL_QUIT may be handled in logic function.
 
 			if(software_rendering) {
 				SDL_UpdateWindowSurface(window);
