@@ -49,7 +49,7 @@ let g:airline#extensions#coc#enabled = 1
 
 
 " --------------coc.nvim settings--------------
-let g:coc_global_extensions = ['coc-json', 'coc-vimlsp', 'coc-clangd', 'coc-explorer', 'coc-pyls', 'coc-html']
+let g:coc_global_extensions = ['coc-json', 'coc-vimlsp', 'coc-clangd', 'coc-jedi', 'coc-explorer', 'coc-html']
 
 " completion configuration
 noremap <silent><expr> <C-space> coc#refresh()
