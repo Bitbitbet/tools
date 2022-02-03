@@ -234,7 +234,7 @@ let g:mkdp_echo_preview_url = 1
 
 " --------------deus settings--------------
 colorscheme deus
-highlight Normal ctermbg=black
+highlight Normal ctermbg=none
 
 
 " --------------nvim settings--------------
