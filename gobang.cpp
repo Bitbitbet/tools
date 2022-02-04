@@ -219,20 +219,20 @@ void CoreGame::place(UCoord c) {
 	iter = (map_size.w - 1 - c.x) > c.y ? UCoord{c.x + c.y, 0} : UCoord{map_size.w - 1, c.y - (map_size.w - 1 - c.x)};
 	row_count = 0; // Search in direction: /
 	for(; iter.x < map_size.w && iter.y < map_size.h; --iter.x, ++iter.y) {
-			if(get(iter) == get(c)) {
-				if(row_count == 0) {
-					start = iter;
-				}
-				++row_count;
-				if(row_count == amount_of_rows) { // someone won
-					rows.first = start;
-					rows.second = iter;
-					m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
-					return;
-				}
-			} else {
-				row_count = 0;
+		if(get(iter) == get(c)) {
+			if(row_count == 0) {
+				start = iter;
 			}
+			++row_count;
+			if(row_count == amount_of_rows) { // someone won
+				rows.first = start;
+				rows.second = iter;
+				m_status = m_is_white_turn ? Status::WHITE_WON : Status::BLACK_WON;
+				return;
+			}
+		} else {
+			row_count = 0;
+		}
 	}
 
 	m_is_white_turn = !m_is_white_turn;

@@ -239,7 +239,7 @@ highlight Normal ctermbg=black
 
 " --------------nvim settings--------------
 " Enable to move a line in normal mode
-noremap <silent> <C-k> ddkP
+noremap <silent> <C-k> kddpk
 noremap <silent> <C-j> ddp
 " inoremap ( ()
 " inoremap [ []
