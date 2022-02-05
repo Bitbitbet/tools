@@ -1,7 +1,7 @@
 highlight pmenu ctermbg=189 ctermfg=0
 
 " Enable to move a line in normal mode
-noremap <C-k> ddkP
+noremap <C-k> kddpk
 noremap <C-j> ddp
 " inoremap ( ()
 " inoremap [ []
