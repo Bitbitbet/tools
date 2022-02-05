@@ -28,9 +28,9 @@ window:
   # Number of lines/columns (not pixels) in the terminal. The number of columns
   # must be at least `2`, while using a value of `0` for columns and lines will
   # fall back to the window manager's recommended size.
-  #dimensions:
-  #  columns: 0
-  #  lines: 0
+  dimensions:
+    columns: 0
+    lines: 0
 
   # Window position (changes require restart)
   #
@@ -737,7 +737,7 @@ colors:
 #
 # If the same trigger is assigned to multiple actions, all of them are executed
 # in the order they were defined in.
-#key_bindings:
+key_bindings:
   #- { key: Paste,                                       action: Paste          }
   #- { key: Copy,                                        action: Copy           }
   #- { key: L,         mods: Control,                    action: ClearLogNotice }
@@ -770,10 +770,26 @@ colors:
   #- { key: V,      mods: Control,       mode: Vi|~Search, action: ToggleBlockSelection    }
   #- { key: V,      mods: Alt,           mode: Vi|~Search, action: ToggleSemanticSelection }
   #- { key: Return,                      mode: Vi|~Search, action: Open                    }
-  #- { key: K,                           mode: Vi|~Search, action: Up                      }
-  #- { key: J,                           mode: Vi|~Search, action: Down                    }
-  #- { key: H,                           mode: Vi|~Search, action: Left                    }
-  #- { key: L,                           mode: Vi|~Search, action: Right                   }
+  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    } # Repeat five times
+  - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
+  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
+  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
+  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
+  - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
+  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
+  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
+  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
+  - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
+  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
+  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
+  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
+  - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
+  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
+  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
+  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
+  - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
+  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
+  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
   #- { key: Up,                          mode: Vi|~Search, action: Up                      }
   #- { key: Down,                        mode: Vi|~Search, action: Down                    }
   #- { key: Left,                        mode: Vi|~Search, action: Left                    }
