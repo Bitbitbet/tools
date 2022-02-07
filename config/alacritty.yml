@@ -770,7 +770,7 @@ key_bindings:
   #- { key: V,      mods: Control,       mode: Vi|~Search, action: ToggleBlockSelection    }
   #- { key: V,      mods: Alt,           mode: Vi|~Search, action: ToggleSemanticSelection }
   #- { key: Return,                      mode: Vi|~Search, action: Open                    }
-  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    } # Repeat five times
+  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    } # Repeat for five times
   - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
   - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
   - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
