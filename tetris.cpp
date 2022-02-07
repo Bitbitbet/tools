@@ -260,7 +260,7 @@ void process_argument(int argc, char **argv) {
 
 	hard_mode.add_name("--hard-mode");
 	hard_mode.set_argc(0);
-	hard_mode.set_act_func([](char **argv) {
+	hard_mode.set_act_func([](char **) {
 		output_hard_mode = true;
 	});
 	hard_mode.set_description("Hard mode output");
@@ -268,7 +268,7 @@ void process_argument(int argc, char **argv) {
 
 	show_buffer_area.add_name("--buffer-area");
 	show_buffer_area.set_argc(0);
-	show_buffer_area.set_act_func([](char **argv) {
+	show_buffer_area.set_act_func([](char **) {
 		if_output_buffer_area = true;
 	});
 	show_buffer_area.set_description("Output buffer area(FOR DEBUG)");
