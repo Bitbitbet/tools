@@ -18,6 +18,7 @@ entropy
 eventually
 exclusive
 exploit
+foolproof
 guarantee
 hostile
 infeasible
@@ -30,6 +31,7 @@ obsolescent
 obsolete // More thorough
 omit
 opaque
+parity
 payload
 perspective
 probabilistic
@@ -37,4 +39,5 @@ procedure
 quote
 respective
 scenario
+sophisticate
 threat
