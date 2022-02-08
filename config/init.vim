@@ -33,10 +33,18 @@ Plug 'vim-airline/vim-airline-themes'
 Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
 Plug 'ajmwagar/vim-deus'
-Plug 'Yggdroot/indentLine'
 Plug 'puremourning/vimspector'
+" Plug 'Yggdroot/indentLine'
+Plug 'mg979/vim-visual-multi', {'branch': 'master'}
 
 call plug#end()
+
+
+
+" -----------visual-cursor settings-----------
+let g:VM_maps = {}
+let g:VM_maps['Find Under']         = '<C-d>'
+let g:VM_maps['Find Subword Under'] = '<C-d>'
 
 
 
