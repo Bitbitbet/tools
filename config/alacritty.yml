@@ -1,4 +1,5 @@
 # Configuration for Alacritty, the GPU enhanced terminal emulator.
+
 # Import additional configuration files
 #
 # Imports are loaded in order, skipping all missing files, with the importing
@@ -7,8 +8,8 @@
 #
 # All imports must either be absolute paths starting with `/`, or paths relative
 # to the user's home directory starting with `~/`.
-#import:
-#  - /path/to/alacritty.yml
+import:
+  - ~/.config/alacritty/custom.yml
 
 # Any items in the `env` entry below will be added as
 # environment variables. Some entries may override variables
@@ -28,9 +29,9 @@ window:
   # Number of lines/columns (not pixels) in the terminal. The number of columns
   # must be at least `2`, while using a value of `0` for columns and lines will
   # fall back to the window manager's recommended size.
-  dimensions:
-    columns: 0
-    lines: 0
+  #dimensions:
+  #  columns: 0
+  #  lines: 0
 
   # Window position (changes require restart)
   #
@@ -49,7 +50,7 @@ window:
   #  y: 0
 
   # Spread additional padding evenly around the terminal content.
-  dynamic_padding: false
+  #dynamic_padding: false
 
   # Window decorations
   #
@@ -60,7 +61,7 @@ window:
   # Values for `decorations` (macOS only):
   #     - transparent: Title bar, transparent background and title bar buttons
   #     - buttonless: Title bar, transparent background and no title bar buttons
-  decorations: full
+  #decorations: full
 
   # Background opacity
   #
@@ -322,7 +323,7 @@ colors:
   # Whether or not `window.opacity` applies to all cell backgrounds or only to
   # the default background. When set to `true` all cells will be transparent
   # regardless of their background color.
-  transparent_background_colors: false
+  #transparent_background_colors: false
 
 # Bell
 #
