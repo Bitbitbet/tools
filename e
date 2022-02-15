@@ -11,6 +11,7 @@ bizarre
 bypass
 catchall
 caveat
+contemporary
 despair
 duplicate
 ellipsis
