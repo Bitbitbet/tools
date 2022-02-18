@@ -27,7 +27,7 @@ struct Color {
 
 class Framebuffer {
 private:
-	bool is_bind = false, if_blend = false;
+	bool if_blend = false;
 	int fbfd;
 	fb_var_screeninfo vinfo;
 	fb_fix_screeninfo finfo;
@@ -35,19 +35,13 @@ private:
 
 	Area fbsize;
 	int bytes_per_pixel;
-
-	mutable int error_code;
 public:
 	Framebuffer() = default;
 	Framebuffer(const std::string &device_name);
 	Framebuffer(const char *device_name);
 	~Framebuffer();
-	bool bind() const;
-	bool bind(const std::string &device_name);
-	bool bind(const char *device_name);
-	bool unbind();
-	void set_if_blend(bool if_blend);
-	bool get_if_blend();
+	void set_blend_mode(bool if_blend);
+	bool get_blend_mode();
 	Area size() const;
 	bool get(UCoord pos, Color &output) const;
 

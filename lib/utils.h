@@ -45,4 +45,20 @@ inline char getch() {
 bool kbhit();
 #endif
 
+#include <type_traits>
+
+using uint_type = size_t;
+using int_type = std::make_signed_t<uint_type>;
+
+struct Area;
+struct Coord {int_type x, y;};
+struct UCoord {uint_type x, y; operator Area() const;};
+struct Area {uint_type w, h; operator UCoord() const;};
+
+inline UCoord::operator Area() const {return {x, y};}
+inline Area::operator UCoord() const {return {w, h};}
+
+constexpr inline bool operator==(Area lfs, Area rfs) {return lfs.w == rfs.w && lfs.h == rfs.h;}
+constexpr inline bool operator!=(Area lfs, Area rfs) {return !(lfs == rfs);}
+
 #endif
