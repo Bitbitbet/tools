@@ -50,8 +50,8 @@ let g:VM_maps['Find Subword Under'] = '<C-d>'
 
 " --------------airline settings--------------
 let g:airline_powerline_fonts=1
-let g:airline#extensions#tabline#enabled = 1
-let g:airline_theme='light'
+" let g:airline#extensions#tabline#enabled = 1
+let g:airline_theme='dark'
 let g:airline#extensions#coc#enabled = 1
 
 
