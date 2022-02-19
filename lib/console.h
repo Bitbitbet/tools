@@ -8,11 +8,6 @@
 #include <utils.h>
 
 namespace console {
-	struct Area;
-	struct Color3;
-	struct Color {uint8_t r, g, b, a; operator Color3() const;};
-	struct Color3 {uint8_t r, g, b; operator Color() const;};
-
 	enum class ColorEnum : int8_t {RED, GREEN, BLUE, PURPLE, CYAN, WHITE, BLACK};
 
 	void cursor_reset();
@@ -37,27 +32,11 @@ namespace console {
 	void color(ColorEnum fore, ColorEnum back);
 	void color_reset();
 
-	inline Color3::operator Color() const {return {r, g, b, 0b11111111};}
-	inline Color::operator Color3() const {return {r, g, b};}
-
 	constexpr inline bool operator==(Coord lfs, Coord rfs) {return lfs.x == rfs.x && lfs.y == rfs.y;}
 	constexpr inline bool operator==(UCoord lfs, UCoord rfs) {return lfs.x == rfs.x && lfs.y == rfs.y;}
-	constexpr inline bool operator==(Color lfs, Color rfs) {
-		return lfs.r == rfs.r &&
-			lfs.g == rfs.g &&
-			lfs.b == rfs.b &&
-			lfs.a == rfs.a;
-	}
-	constexpr bool operator==(Color3 lfs, Color3 rfs) {
-		return lfs.r == rfs.r &&
-			lfs.g == rfs.g &&
-			lfs.b == rfs.b;
-	}
 
 	constexpr inline bool operator!=(Coord lfs, Coord rfs) {return !(lfs == rfs);}
 	constexpr inline bool operator!=(UCoord lfs, UCoord rfs) {return !(lfs == rfs);}
-	constexpr inline bool operator!=(Color lfs, Color rfs) {return !(lfs == rfs);}
-	constexpr inline bool operator!=(Color3 lfs, Color3 rfs) {return !(lfs == rfs);}
 
 
 	enum class Key : uint8_t {

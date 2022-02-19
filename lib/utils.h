@@ -51,14 +51,35 @@ using uint_type = size_t;
 using int_type = std::make_signed_t<uint_type>;
 
 struct Area;
+struct Color3;
 struct Coord {int_type x, y;};
 struct UCoord {uint_type x, y; constexpr operator Area() const;};
 struct Area {uint_type w, h; constexpr operator UCoord() const;};
+struct Color {uint8_t r, g, b, a; constexpr operator Color3() const;};
+struct Color3 {uint8_t r, g, b; constexpr operator Color() const;};
 
 constexpr inline UCoord::operator Area() const {return {x, y};}
 constexpr inline Area::operator UCoord() const {return {w, h};}
 
 constexpr inline bool operator==(Area lfs, Area rfs) {return lfs.w == rfs.w && lfs.h == rfs.h;}
 constexpr inline bool operator!=(Area lfs, Area rfs) {return !(lfs == rfs);}
+
+constexpr inline Color3::operator Color() const {return {r, g, b, 0b11111111};}
+constexpr inline Color::operator Color3() const {return {r, g, b};}
+
+constexpr inline bool operator==(Color lfs, Color rfs) {
+	return lfs.r == rfs.r &&
+		lfs.g == rfs.g &&
+		lfs.b == rfs.b &&
+		lfs.a == rfs.a;
+}
+constexpr bool operator==(Color3 lfs, Color3 rfs) {
+	return lfs.r == rfs.r &&
+		lfs.g == rfs.g &&
+		lfs.b == rfs.b;
+}
+constexpr inline bool operator!=(Color lfs, Color rfs) {return !(lfs == rfs);}
+constexpr inline bool operator!=(Color3 lfs, Color3 rfs) {return !(lfs == rfs);}
+
 
 #endif

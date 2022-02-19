@@ -5,56 +5,64 @@
 #include <string>
 #include <linux/fb.h>
 #include <cstdint>
+#include <utils.h>
 
-struct Coord {
-	using coord_type = int32_t;
-	coord_type x, y;
+class FramebufferError : std::exception {
+	friend class Framebuffer;
+public:
+	virtual const char *what() const noexcept override {return msg.c_str();}
+private:
+	FramebufferError(std::string_view msg_) : std::exception(), msg(msg_) {}
+
+	std::string msg;
 };
 
-struct UCoord {
-	using coord_type = uint32_t;
-	coord_type x, y;
-};
-
-struct Area {
-	using area_type = uint32_t;
-	area_type width, height;
-};
-
-struct Color {
-	uint8_t r = 0, g = 0, b = 0, a = 255;
-};
+/*
+ * O-------------> x
+ * |
+ * |
+ * |
+ * |
+ * |
+ * \/
+ * y
+ */
 
 class Framebuffer {
 private:
-	bool if_blend = false;
-	int fbfd;
-	fb_var_screeninfo vinfo;
-	fb_fix_screeninfo finfo;
-	unsigned char *data, *buffer;
+	bool if_blend;
+	bool if_nobuffer;
+	bool m_valid;
 
+	int fbfd;
+	unsigned char *data, *buffer;
 	Area fbsize;
-	int bytes_per_pixel;
+	decltype(std::declval<fb_fix_screeninfo>().smem_len) smem_len;
+	decltype(std::declval<fb_var_screeninfo>().bits_per_pixel) bytes_per_pixel;
+	decltype(std::declval<fb_fix_screeninfo>().line_length) line_length;
 public:
-	Framebuffer() = default;
-	Framebuffer(const std::string &device_name);
-	Framebuffer(const char *device_name);
+	Framebuffer() : if_blend(false), if_nobuffer(false), m_valid(false), fbfd(0), data(nullptr), buffer(nullptr) {}
+	Framebuffer(std::string_view device_name, bool nobuffer = false);
+	Framebuffer(const Framebuffer &) = delete;
+	Framebuffer(Framebuffer &&);
 	~Framebuffer();
-	void set_blend_mode(bool if_blend);
-	bool get_blend_mode();
+	Framebuffer &operator=(const Framebuffer &) = delete;
+	Framebuffer &operator=(Framebuffer &&) &;
+	bool valid() const {return m_valid;}
+	bool nobuffer() const {return if_nobuffer;}
+	void set_blend_mode(bool if_blend) {this->if_blend = if_blend;}
+	bool get_blend_mode() const {return if_blend;}
 	Area size() const;
-	bool get(UCoord pos, Color &output) const;
+	Color get(UCoord pos) const;
 
 	void update();
 	void reset_buffer();
 
-	bool set(UCoord pos, Color c);
-	bool fill(Color c);
-	//void draw_line(int x1, int y1, int x2, int y2);
+	void set(UCoord pos, Color c);
+	void fill(Color c);
 	void draw_rectangle(UCoord, Area, Color);
 	void fill_rectangle(UCoord, Area, Color);
-
-	const char *get_error_message();
+	void draw_line(UCoord, UCoord, Color);
 };
 
 #endif
