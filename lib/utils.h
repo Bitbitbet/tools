@@ -1,13 +1,13 @@
-#ifndef __UTILS_H__
-#define __UTILS_H__
-
 #ifdef INCLUDE_ARGUMENT
-#include "argument_utils.h"
+#include <argument_utils.h>
 #endif
 
 #ifdef INCLUDE_FRAMEBUFFER
-#include "framebuffer_utils.h"
+#include <framebuffer_utils.h>
 #endif
+
+#ifndef __UTILS_H__
+#define __UTILS_H__
 
 void log(const char *description, ...);
 void log_error(const char *description, ...);
@@ -52,11 +52,11 @@ using int_type = std::make_signed_t<uint_type>;
 
 struct Area;
 struct Coord {int_type x, y;};
-struct UCoord {uint_type x, y; operator Area() const;};
-struct Area {uint_type w, h; operator UCoord() const;};
+struct UCoord {uint_type x, y; constexpr operator Area() const;};
+struct Area {uint_type w, h; constexpr operator UCoord() const;};
 
-inline UCoord::operator Area() const {return {x, y};}
-inline Area::operator UCoord() const {return {w, h};}
+constexpr inline UCoord::operator Area() const {return {x, y};}
+constexpr inline Area::operator UCoord() const {return {w, h};}
 
 constexpr inline bool operator==(Area lfs, Area rfs) {return lfs.w == rfs.w && lfs.h == rfs.h;}
 constexpr inline bool operator!=(Area lfs, Area rfs) {return !(lfs == rfs);}

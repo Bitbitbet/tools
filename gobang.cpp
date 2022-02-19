@@ -21,10 +21,6 @@
 #include <utils.h>
 
 
-using console::int_type;
-using console::uint_type;
-using console::UCoord;
-using console::Area;
 using console::ArrowKeyPraser;
 using console::ColorEnum;
 using console::color_reset;

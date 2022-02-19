@@ -15,9 +15,6 @@
 #include "utils.h"
 
 using console::ColorEnum;
-using console::Area;
-using console::UCoord;
-using console::uint_type;
 using console::ArrowKeyPraser;
 using console::color_reset;
 using console::cursor_gotoxy;

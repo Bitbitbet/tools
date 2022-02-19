@@ -42,34 +42,9 @@ inline void delay_us(uint32_t ms) {
 	 std::this_thread::sleep_for(std::chrono::microseconds(ms));
 }
 
-struct Coord {
-	using coord_type = int32_t;
-	coord_type x, y;
-	constexpr Coord() : x(0), y(0) {}
-	constexpr Coord(coord_type x_, coord_type y_) : x(x_), y(y_) {}
-};
-constexpr Coord operator+(const Coord &a, const Coord &b) {
-	return Coord{a.x + b.x, a.y + b.y};
-}
-
-struct Area {
-	using size_type = uint32_t;
-	size_type width, height;
-
-	constexpr Area() : width(0), height(0) {}
-	constexpr Area(size_t w, size_t h) : width(w), height(h) {}
-	constexpr size_type size() const {
-		return width * height;
-	}
-};
-
-constexpr bool operator==(const Area &a, const Area &b) {
-	return a.width == b.width && a.height == b.height;
-}
-
 const Area DEFAULT_MAP_SIZE = {10, 20};
 const Area MINIMUM_MAP_SIZE = {10, 10};
-const Area::size_type BUFFER_AREA_HEIGHT = 4;
+const uint_type BUFFER_AREA_HEIGHT = 4;
 const uint32_t DEFAULT_DELAY_TIME = 500;
 
 Area map_size = DEFAULT_MAP_SIZE;
@@ -89,6 +64,10 @@ enum class FieldEnum : int8_t {
 enum class Key : uint8_t {
 	DOWN, LEFT, RIGHT, ROTATE, SKIP, QUIT, /*Shouldn't be passed to the user*/NOT_ARROW_KEY, PART_OF_ARROW_KEY
 };
+
+constexpr inline Coord operator+(Coord lfs, Coord rfs) {
+	return {lfs.x + rfs.x, lfs.y + rfs.y};
+}
 
 inline namespace OperatorSystemRelativedCode {
 #ifdef __WIN32
@@ -361,23 +340,23 @@ public:
 
 class Map {
 public:
-	Map(Area area_) : m_area(area_), data(new FieldEnum[area_.size()]), enable_minus_data(false) {
-		memset(data.get(), static_cast<int>(FieldEnum::empty), sizeof(FieldEnum) * m_area.size());
+	Map(Area area_) : m_area(area_), data(new FieldEnum[area_.w * area_.h]), enable_minus_data(false) {
+		memset(data.get(), static_cast<int>(FieldEnum::empty), sizeof(FieldEnum) * m_area.w * m_area.h);
 	}
 
-	Map(Area area_, Area::size_type buffer_height) :
+	Map(Area area_, uint_type buffer_height) :
 		m_area(area_),
-		data(new FieldEnum[area_.size()]),
-		m_minus_area{area_.width, buffer_height},
-		minus_data(new FieldEnum[m_minus_area.size()]),
+		data(new FieldEnum[area_.w * area_.h]),
+		m_minus_area{area_.w, buffer_height},
+		minus_data(new FieldEnum[m_minus_area.w * m_minus_area.h]),
 		enable_minus_data(true) {
 		clear();
 	}
 
 	Map(const Map &map) : m_area(map.m_area), m_minus_area(map.m_minus_area), enable_minus_data(map.enable_minus_data) {
-		data.reset(new FieldEnum[m_area.size()]);
+		data.reset(new FieldEnum[m_area.w * m_area.h]);
 		if(enable_minus_data) {
-			minus_data.reset(new FieldEnum[m_minus_area.size()]);
+			minus_data.reset(new FieldEnum[m_minus_area.w * m_minus_area.h]);
 		}
 		copy(map);
 	}
@@ -399,9 +378,9 @@ public:
 		m_area = map.m_area;
 		m_minus_area = map.m_minus_area;
 		enable_minus_data = map.enable_minus_data;
-		data.reset(new FieldEnum[m_area.size()]);
+		data.reset(new FieldEnum[m_area.w * m_area.h]);
 		if(enable_minus_data) {
-			minus_data.reset(new FieldEnum[m_minus_area.size()]);
+			minus_data.reset(new FieldEnum[m_minus_area.w * m_minus_area.h]);
 		}
 		copy(map);
 		return *this;
@@ -412,9 +391,9 @@ public:
 	}
 
 	void clear() {
-		memset(data.get(), static_cast<int>(FieldEnum::empty), sizeof(FieldEnum) * m_area.size());
+		memset(data.get(), static_cast<int>(FieldEnum::empty), sizeof(FieldEnum) * m_area.w * m_area.h);
 		if(enable_minus_data) {
-			memset(minus_data.get(), static_cast<int>(FieldEnum::empty), sizeof(FieldEnum) * m_minus_area.size());
+			memset(minus_data.get(), static_cast<int>(FieldEnum::empty), sizeof(FieldEnum) * m_minus_area.w * m_minus_area.h);
 		}
 	}
 	FieldEnum &operator[](const Coord &coord) {
@@ -425,10 +404,10 @@ public:
 	}
 
 	bool vaild(const Coord &coord) const {
-		if(coord.x < 0 || coord.x >= m_area.width) return false;
-		if(enable_minus_data && coord.y < 0 && -coord.y <= m_minus_area.height) {
+		if(coord.x < 0 || coord.x >= m_area.w) return false;
+		if(enable_minus_data && coord.y < 0 && -coord.y <= m_minus_area.h) {
 			return true;
-		} else if(coord.y >= 0 && coord.y < m_area.height) {
+		} else if(coord.y >= 0 && coord.y < m_area.h) {
 			return true;
 		} else {
 			return false;
@@ -459,15 +438,15 @@ private:
 	FieldEnum &get(const Coord &coord) const {
 		assert(vaild(coord));
 		if(coord.y < 0) {
-			return minus_data[coord.x + (-coord.y - 1) * m_minus_area.width];
+			return minus_data[coord.x + (-coord.y - 1) * m_minus_area.w];
 		}
-		return data[coord.x + coord.y * m_area.width];
+		return data[coord.x + coord.y * m_area.w];
 	}
 	void copy(const Map &map) {
 		assert(map.m_area == m_area && map.enable_minus_data == enable_minus_data && map.m_minus_area == m_minus_area);
-		memcpy(data.get(), map.data.get(), sizeof(FieldEnum) * m_area.size());
+		memcpy(data.get(), map.data.get(), sizeof(FieldEnum) * m_area.w * m_area.h);
 		if(enable_minus_data) {
-			memcpy(minus_data.get(), map.minus_data.get(), sizeof(FieldEnum) * m_minus_area.size());
+			memcpy(minus_data.get(), map.minus_data.get(), sizeof(FieldEnum) * m_minus_area.w * m_minus_area.h);
 		}
 	}
 };
@@ -490,17 +469,17 @@ public:
 		}
 	}
 
-	constexpr Coord::coord_type left(const size_t shapeno) const {
+	constexpr int_type left(const size_t shapeno) const {
 		assert(shapeno < shape_count);
-		Coord::coord_type result = numeric_limits<Coord::coord_type>::max();
+		int_type result = numeric_limits<int_type>::max();
 		for(size_t i = 0; i < UNITS_COUNT; ++i) {
 			if(shapes[shapeno][i].x < result) result = shapes[shapeno][i].x;
 		}
 		return result;
 	}
-	constexpr Coord::coord_type right(const size_t shapeno) const {
+	constexpr int_type right(const size_t shapeno) const {
 		assert(shapeno < shape_count);
-		Coord::coord_type result = numeric_limits<Coord::coord_type>::min();
+		int_type result = numeric_limits<int_type>::min();
 		for(size_t i = 0; i < UNITS_COUNT; ++i) {
 			if(shapes[shapeno][i].x > result) result = shapes[shapeno][i].x;
 		}
@@ -508,8 +487,8 @@ public:
 	}
 	constexpr Area area(const size_t shapeno) const {
 		assert(shapeno < shape_count);
-		Coord min{numeric_limits<Coord::coord_type>::max(), numeric_limits<Coord::coord_type>::max()};
-		Coord max{numeric_limits<Coord::coord_type>::min(), numeric_limits<Coord::coord_type>::min()};
+		Coord min{numeric_limits<int_type>::max(), numeric_limits<int_type>::max()};
+		Coord max{numeric_limits<int_type>::min(), numeric_limits<int_type>::min()};
 		for(size_t i = 0; i < UNITS_COUNT; ++i) {
 			const Coord coord = shapes[shapeno][i];
 			if(coord.x > max.x) max.x = coord.x;
@@ -518,8 +497,8 @@ public:
 			if(coord.y < min.y) min.y = coord.y;
 		}
 		Area result;
-		result.width = max.x - min.x + 1;
-		result.height = max.y - min.y + 1;
+		result.w = max.x - min.x + 1;
+		result.h = max.y - min.y + 1;
 		return result;
 	}
 	constexpr size_t next_shapeno(const size_t shapeno) const {
@@ -555,7 +534,7 @@ public:
 		}
 	}
 private:
-	Coord shapes[MAXIMUM_SHAPES_COUNT][UNITS_COUNT];
+	Coord shapes[MAXIMUM_SHAPES_COUNT][UNITS_COUNT] {};
 	size_t shape_count = 0;
 	FieldEnum tetromino;
 };
@@ -698,8 +677,8 @@ private:
 		};
 		output_ground();
 
-		for(Coord::coord_type y = 0; y < area.height; ++y) {
-			for(Coord::coord_type x = 0; x < area.width; ++x) {
+		for(int_type y = 0; y < area.h; ++y) {
+			for(int_type x = 0; x < area.w; ++x) {
 				if(map[{x, y}] != output_soft_helper[{x, y}]) {
 					gotoxy({x, y});
 					output_field(map[{x, y}]);
@@ -708,7 +687,7 @@ private:
 			}
 		}
 		cursor_pos_load();
-		cursor_down(area.height + 1);
+		cursor_down(area.h + 1);
 		output_ground();
 		cout << "Score: " << helper.score << "\n";
 	}
@@ -717,22 +696,22 @@ private:
 		const Area area = map.area();
 		if(false) {
 			const Area minus_area = map.minus_area();
-			for(size_t i = 0; i < minus_area.width * 2 + 2; ++i) {
+			for(size_t i = 0; i < minus_area.w * 2 + 2; ++i) {
 				cout << '-';
 			}
 			cout << '\n';
-			for(Coord::coord_type y = -minus_area.height; y < 0; ++y) {
+			for(int_type y = -minus_area.h; y < 0; ++y) {
 				cout << '|';
-				for(Coord::coord_type x = 0; x < minus_area.width; ++x) {
+				for(int_type x = 0; x < minus_area.w; ++x) {
 					output_field(map[{x, y}]);
 				}
 				cout << "|\n";
 			}
 		}
 		output_ground();
-		for(Coord::coord_type y = 0; y < area.height; ++y) {
+		for(int_type y = 0; y < area.h; ++y) {
 			cout << '|';
-			for(Coord::coord_type x = 0; x < area.width; ++x) {
+			for(int_type x = 0; x < area.w; ++x) {
 				output_field(map[{x, y}]);
 			}
 			cout << "|\n";
@@ -742,7 +721,7 @@ private:
 		output_soft_helper = map;
 	}
 	void output_ground() const {
-		const auto width = helper.map.area().width;
+		const auto width = helper.map.area().w;
 		const auto controlled_tetromino_pos = helper.controlled_tetromino_pos;
 		const size_t shapeno = helper.shapeno;
 		const Tetromino &tetro = tetrominos[helper.field_now];
@@ -757,7 +736,7 @@ private:
 	}
 	void output_next_tetromino() {
 		if(output_next_tetromino_helper == helper.field_next) {
-			cursor_down(output_next_tetromino_map_helper.area().height + 1);//one for top
+			cursor_down(output_next_tetromino_map_helper.area().h + 1);//one for top
 			return;
 		}
 		output_next_tetromino_helper = helper.field_next;
@@ -767,20 +746,20 @@ private:
 		const Area tetro_area = tetro.area(0);
 		const Area helper_area = output_next_tetromino_map_helper.area();
 		Coord pos;
-		pos.x = (helper_area.width - tetro_area.width) / 2;
-		pos.y = (helper_area.height - tetro_area.height) / 2;
+		pos.x = (helper_area.w - tetro_area.w) / 2;
+		pos.y = (helper_area.h - tetro_area.h) / 2;
 
 		output_next_tetromino_map_helper.clear();
 		tetro.print(output_next_tetromino_map_helper, pos, 0);
-		cursor_right(map_area.width - helper_area.width);
-		for(Coord::coord_type i = 0; i < helper_area.width + 1; ++i) {
+		cursor_right(map_area.w - helper_area.w);
+		for(int_type i = 0; i < helper_area.w + 1; ++i) {
 			cout << "--";
 		}
 		cout << '\n';
-		for(Coord::coord_type y = 0; y < helper_area.height; ++y) {
-			cursor_right(map_area.width - helper_area.width);
+		for(int_type y = 0; y < helper_area.h; ++y) {
+			cursor_right(map_area.w - helper_area.w);
 			cout << "|";
-			for(Coord::coord_type x = 0; x < helper_area.width; ++x) {
+			for(int_type x = 0; x < helper_area.w; ++x) {
 				output_field(output_next_tetromino_map_helper[{x, y}]);
 			}
 			cout << "|\n";
@@ -812,11 +791,11 @@ private:
 	}
 	void check() {
 		const Area area = map.area();
-		vector<bool> clears(area.height);
+		vector<bool> clears(area.h);
 		size_t clear_count = 0;
-		for(Coord::coord_type y = area.height - 1; y >= 0; --y) {
+		for(int_type y = area.h - 1; y >= 0; --y) {
 			bool clear = true;
-			for(Coord::coord_type x = 0; x < area.width; ++x) {
+			for(int_type x = 0; x < area.w; ++x) {
 				if(map[{x, y}] == FieldEnum::empty) {
 					clear = false;
 					break;
@@ -834,33 +813,33 @@ private:
 			case 3: score += 80;break;
 			case 4: score += 160;break;
 		}
-		for(Coord::coord_type i = 0; i < (area.width + 1) / 2; ++i) {
-			for(Coord::coord_type y = 0; y < area.height; ++y) {
+		for(int_type i = 0; i < (area.w + 1) / 2; ++i) {
+			for(int_type y = 0; y < area.h; ++y) {
 				if(clears[y]) {
 					Coord a, b;
 					a.y = y;
 					b.y = y;
-					a.x = (area.width - 1) / 2 - i;
-					if(area.width % 2 == 0) {
-						b.x = area.width / 2 + i;
+					a.x = (area.w - 1) / 2 - i;
+					if(area.w % 2 == 0) {
+						b.x = area.w / 2 + i;
 					} else {
-						b.x = (area.width - 1) / 2 + i;
+						b.x = (area.w - 1) / 2 + i;
 					}
 					map[a] = FieldEnum::empty;
 					map[b] = FieldEnum::empty;
 				}
 			}
 			screen.refresh_unlocked_and_wait();
-			delay(delay_time / area.width);
+			delay(delay_time / area.w);
 		}
-		Coord::coord_type fall_line = 0;
-		for(Coord::coord_type y = area.height - 1; y >= 0; --y) {
+		int_type fall_line = 0;
+		for(int_type y = area.h - 1; y >= 0; --y) {
 			if(clears[y]) {
 				++fall_line;
 				continue;
 			}
 			if(fall_line > 0) {
-				for(Coord::coord_type x = 0; x < area.width; ++x) {
+				for(int_type x = 0; x < area.w; ++x) {
 					map[{x, y + fall_line}] = map[{x, y}];
 					map[{x, y}] = FieldEnum::empty;
 				}
@@ -876,10 +855,10 @@ private:
 		shapeno = 0;
 		const Tetromino &tetro = tetrominos[field_now];
 		const Area tarea = tetro.area(shapeno);
-		assert(tarea.height <= map.minus_area().height);
+		assert(tarea.h <= map.minus_area().h);
 		controlled_tetromino_pos = {
-			static_cast<Coord::coord_type>((map.minus_area().width - tarea.width)/ 2),
-			-static_cast<Coord::coord_type>(tarea.height)
+			static_cast<int_type>((map.minus_area().w - tarea.w)/ 2),
+			-static_cast<int_type>(tarea.h)
 		};
 
 		if(!tetro.fit(map, controlled_tetromino_pos, shapeno)) {
@@ -1032,22 +1011,22 @@ bool process_argument(int argc, char **argv) {
 		bool success;
 		Area a;
 
-		a.width = parse_int(argv[0], &success);
+		a.w = parse_int(argv[0], &success);
 		if(!success) {
 			log_error("The width of the map should be an integer, but got %s", argv[0]);
 			end(-1);
 		}
-		a.height = parse_int(argv[1], &success);
+		a.h = parse_int(argv[1], &success);
 		if(!success) {
 			log_error("The height of the map should be an integer, but got %s", argv[1]);
 			end(-1);
 		}
-		if(a.width < MINIMUM_MAP_SIZE.width) {
-			log_error("The width of the map \"%d\" is too small.", a.width);
+		if(a.w < MINIMUM_MAP_SIZE.w) {
+			log_error("The width of the map \"%d\" is too small.", a.w);
 			end(-1);
 		}
-		if(a.height < MINIMUM_MAP_SIZE.height) {
-			log_error("The height of the map \"%d\" is too small.", a.height);
+		if(a.h < MINIMUM_MAP_SIZE.h) {
+			log_error("The height of the map \"%d\" is too small.", a.h);
 			end(-1);
 		}
 		map_size = a;
