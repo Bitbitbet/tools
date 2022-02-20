@@ -13,6 +13,7 @@ catchall
 caveat
 contemporary
 despair
+dispatch
 duplicate
 ellipsis
 entropy
@@ -20,6 +21,7 @@ eventually
 exclusive
 exploit
 foolproof
+forthcoming
 guarantee
 hostile
 infeasible
@@ -38,7 +40,9 @@ perspective
 probabilistic
 procedure
 quote
+resemble
 respective
 scenario
+sketch
 sophisticate
 threat
