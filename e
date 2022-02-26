@@ -25,6 +25,7 @@ forthcoming
 guarantee
 hostile
 infeasible
+intention(al(ly))
 jailbreak
 malicious
 misery

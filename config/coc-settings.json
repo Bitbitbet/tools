@@ -5,6 +5,8 @@
 	"diagnostic.refreshOnInsertMode": false,
 	"diagnostic.enableHighlightLineNumber": true,
 	"diagnostic.enableSign": true,
+	"diagnostic.virtualText": true,
+	"diagnostic.virtualTextCurrentLineOnly": false,
 	"suggest.defaultSortMethod": "alphabetical",
 	"suggest.completionItemKindLabels": {
 		"class": "\uf0e8",
