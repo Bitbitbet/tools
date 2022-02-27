@@ -1504,7 +1504,7 @@ namespace frontend_with_console {
 	constexpr ColorEnum SELECTION_COLOR = ColorEnum::CYAN;
 
 	enum class Key : uint8_t {
-		UP, DOWN, LEFT, RIGHT, ENTER, RESET/* reset the selection position */, QUIT
+		UP, DOWN, LEFT, RIGHT, ENTER, RESET/* reset the selection position */, PRINT, QUIT
 	};
 	constexpr inline Key key_from_console_key(console::Key k) {
 		switch(k) {
@@ -1643,7 +1643,7 @@ namespace frontend_with_console {
 		ArrowKeyPraser praser;
 		while(true) {
 			unsigned char input = getch();
-			Key key = Key::UP; //Why is this initialized with Key::UP? to AVOID STUPID WARNING FROM GCC ONCE AGAIN
+			Key key {};
 			auto praser_result = praser(input);
 			switch(praser_result.first) {
 				case ArrowKeyPraser::Status::MATCH:
@@ -1661,6 +1661,7 @@ namespace frontend_with_console {
 					case 'W': case 'K': key = Key::UP; break;
 					case 'D': case 'L': key = Key::RIGHT; break;
 					case 'R': key = Key::RESET; break;
+					case 'P': key = Key::PRINT; break;
 					case 'Q': key = Key::QUIT; break;
 					case '\n': case ' ': key = Key::ENTER; break;
 					default: continue;
@@ -1668,6 +1669,7 @@ namespace frontend_with_console {
 			}
 
 
+			bool if_print_diff = true;
 			if(key == Key::QUIT) {
 				return;
 			} else if(key == Key::ENTER) {
@@ -1695,6 +1697,8 @@ namespace frontend_with_console {
 					++iter.x;
 				}
 				if(!reset_success) return;
+			} else if (key == Key::PRINT) {
+				if_print_diff = false;
 			} else {
 				UCoord new_selection_pos = selection_pos;
 				auto inboard = [](UCoord c) -> bool {
@@ -1750,7 +1754,12 @@ namespace frontend_with_console {
 				}
 			}
 
-			print_diff(game, bufgame);
+			if (if_print_diff) {
+				print_diff(game, bufgame);
+			} else {
+				console::cursor_reset();
+				print(game);
+			}
 			print_selection(game, selection_pos, true, buf_selection_pos);
 			bufgame = game;
 			buf_selection_pos = selection_pos;
