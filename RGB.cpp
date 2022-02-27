@@ -79,7 +79,7 @@ int main(int, char **) {
 	SDL_Event event;
 	while(true) {
 		SDL_PollEvent(&event);
-		if(event.type == SDL_QUIT) {
+		if(event.type == SDL_QUIT || event.type == SDL_MOUSEBUTTONDOWN) {
 			request_exit = true;
 			break;
 		}
