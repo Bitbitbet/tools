@@ -1327,18 +1327,28 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		}
 		// Preparing renderer
 		SDL_Surface *screen;
-		if(software_rendering) {
+		auto software_rendering_setup_f = [&screen, this] (){
 			screen = SDL_GetWindowSurface(window);
 			render = SDL_CreateSoftwareRenderer(screen);
 			if(!render) {
 				log_error("Can't create software renderer.");
 				exit(1);
 			}
+		};
+		if(software_rendering) {
+			software_rendering_setup_f();
 		} else {
 			render = SDL_CreateRenderer(window, -1,
-					SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+					SDL_RENDERER_ACCELERATED/* | SDL_RENDERER_PRESENTVSYNC */);
 			if(render) {
 				screen = SDL_GetWindowSurface(window);
+				if (!screen) {
+					log_error("Error: %s. Falling back to software rendering.");
+					SDL_DestroyRenderer(render);
+					render = nullptr;
+					software_rendering_setup_f();
+					software_rendering = true;
+				}
 			} else {
 				log_error("Warning: cannot create renderer with hardware acceleration: %s.", SDL_GetError());
 				render = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
