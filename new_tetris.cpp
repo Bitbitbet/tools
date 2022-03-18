@@ -595,7 +595,7 @@ struct ScreenOutputHelper {
 	const size_t &shapeno, &score;
 };
 
-class Screen {//UNIX-STYLE CONSOLE ONLY
+class Screen {
 public:
 	Screen(const ScreenOutputHelper &helper_) :
 	running(false) , will_refresh(false), helper(helper_), output_soft_helper(helper.map), output_next_tetromino_helper(FieldEnum::empty) {
