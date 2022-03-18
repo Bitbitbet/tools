@@ -11,6 +11,7 @@ bizarre
 bypass
 catchall
 caveat
+confiscate
 contemporary
 despair
 dispatch
@@ -23,6 +24,7 @@ exploit
 foolproof
 forthcoming
 guarantee
+hierarchical
 hostile
 infeasible
 intention(al(ly))
@@ -35,6 +37,7 @@ obsolescent
 obsolete // More thorough
 omit
 opaque
+overlap
 parity
 payload
 perspective
