@@ -50,6 +50,8 @@ SDL_Color next_color(SDL_Color prv) {
 std::atomic_int fps;
 std::atomic_bool request_exit = false;
 
+bool software_rendering = false;
+
 void fps_displayer() {
 	fps = 0;
 	while(!request_exit) {
@@ -68,9 +70,20 @@ int main(int, char **) {
 
 	SDL_Window *window = SDL_CreateWindow("test", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
 	SDL_Renderer *render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-	if(!window || !render) {
+	if(!window) {
 		fprintf(stderr, "%s\n", SDL_GetError());
 		return 2;
+	}
+
+	if(!render) {
+		fprintf(stderr, "%s\n", SDL_GetError());
+
+		render = SDL_CreateSoftwareRenderer(SDL_GetWindowSurface(window));
+		software_rendering = true;
+		if(!render) {
+			fprintf(stderr, "%s\n", SDL_GetError());
+			return 3;
+		}
 	}
 
 	std::thread t(fps_displayer);
@@ -88,7 +101,11 @@ int main(int, char **) {
 
 		SDL_RenderFillRect(render, nullptr);
 
-		SDL_RenderPresent(render);
+		if (software_rendering) {
+			SDL_UpdateWindowSurface(window);
+		} else {
+			SDL_RenderPresent(render);
+		}
 
 		++fps;
 
