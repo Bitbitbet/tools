@@ -45,24 +45,29 @@ colors:
 shell:
   program: cmd
 key_bindings:
-  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    } # Repeat for five times
-  - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
-  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
-  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
+  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
+  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
+  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
+  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
   - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
   - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
-  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
-  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
-  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
+  - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
+  - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
+  - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
   - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
   - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
-  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
-  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
-  - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
+  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
+  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
+  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
+  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
+  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
   - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
   - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
-  - { key: K, mods: Shift, mode: Vi|~Search, action: Up    }
-  - { key: J, mods: Shift, mode: Vi|~Search, action: Down  }
-  - { key: H, mods: Shift, mode: Vi|~Search, action: Left  }
   - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
+  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
+  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
+  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
+  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
+  - { key: L, mods: Shift, mode: Vi|~Search, action: Right }
+
   - { key: N, mods: Control | Shift, action: CreateNewWindow }
