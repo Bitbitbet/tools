@@ -41,7 +41,7 @@
 		"html"
 	],
 	"clangd.arguments": [
-		"clang-tidy"
+		"--clang-tidy"
 	],
 	"explorer.quitOnOpen": true,
 	"explorer.icon.enableNerdfont": true,
