@@ -53,14 +53,20 @@ using int_type = std::make_signed_t<uint_type>;
 struct Area;
 struct Color3;
 struct Coord {int_type x, y;};
-struct UCoord {uint_type x, y; constexpr operator Area() const;};
-struct Area {uint_type w, h; constexpr operator UCoord() const;};
-struct Color {uint8_t r, g, b, a; constexpr operator Color3() const;};
-struct Color3 {uint8_t r, g, b; constexpr operator Color() const;};
+struct UCoord {uint_type x, y; explicit constexpr operator Area() const;};
+struct Area {uint_type w, h; explicit constexpr operator UCoord() const;};
+struct Color {uint8_t r, g, b, a; explicit constexpr operator Color3() const;};
+struct Color3 {uint8_t r, g, b; explicit constexpr operator Color() const;};
+struct Rect {Coord coord; Area area;};
+struct URect {UCoord coord; Area area;};
 
 constexpr inline UCoord::operator Area() const {return {x, y};}
 constexpr inline Area::operator UCoord() const {return {w, h};}
 
+constexpr inline bool operator==(Coord lfs, Coord rfs) {return lfs.x == rfs.x && lfs.y == rfs.y;}
+constexpr inline bool operator!=(Coord lfs, Coord rfs) {return !(lfs == rfs);}
+constexpr inline bool operator==(UCoord lfs, UCoord rfs) {return lfs.x == rfs.x && lfs.y == rfs.y;}
+constexpr inline bool operator!=(UCoord lfs, UCoord rfs) {return !(lfs == rfs);}
 constexpr inline bool operator==(Area lfs, Area rfs) {return lfs.w == rfs.w && lfs.h == rfs.h;}
 constexpr inline bool operator!=(Area lfs, Area rfs) {return !(lfs == rfs);}
 
@@ -80,6 +86,21 @@ constexpr bool operator==(Color3 lfs, Color3 rfs) {
 }
 constexpr inline bool operator!=(Color lfs, Color rfs) {return !(lfs == rfs);}
 constexpr inline bool operator!=(Color3 lfs, Color3 rfs) {return !(lfs == rfs);}
+
+constexpr inline bool operator==(Rect lfs, Rect rfs) {
+	return lfs.coord == rfs.coord &&
+		lfs.area == rfs.area;
+}
+constexpr inline bool operator!=(Rect lfs, Rect rfs) {
+	return !(lfs == rfs);
+}
+constexpr inline bool operator==(URect lfs, URect rfs) {
+	return lfs.coord == rfs.coord &&
+		lfs.area == rfs.area;
+}
+constexpr inline bool operator!=(URect lfs, URect rfs) {
+	return !(lfs == rfs);
+}
 
 
 #endif

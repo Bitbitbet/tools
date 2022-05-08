@@ -32,12 +32,6 @@ namespace console {
 	void color(ColorEnum fore, ColorEnum back);
 	void color_reset();
 
-	constexpr inline bool operator==(Coord lfs, Coord rfs) {return lfs.x == rfs.x && lfs.y == rfs.y;}
-	constexpr inline bool operator==(UCoord lfs, UCoord rfs) {return lfs.x == rfs.x && lfs.y == rfs.y;}
-
-	constexpr inline bool operator!=(Coord lfs, Coord rfs) {return !(lfs == rfs);}
-	constexpr inline bool operator!=(UCoord lfs, UCoord rfs) {return !(lfs == rfs);}
-
 
 	enum class Key : uint8_t {
 		UP, DOWN, LEFT, RIGHT

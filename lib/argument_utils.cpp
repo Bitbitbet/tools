@@ -154,7 +154,7 @@ bool ArgumentProcessor::process(size_t argc, char **argv) const {
 			return false;
 		}
 		if(result[&called_arg].called_time == called_arg.max_called_time) {
-			log_error("The time of argument \"%s\" to be called reaches its limit %d.", called_arg_name, called_arg.max_called_time);
+			log_error("\"%s\" was called more than a maximum of %d.", called_arg_name, called_arg.max_called_time);
 			return false;
 		}
 		auto &temp = result[&called_arg];
