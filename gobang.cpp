@@ -38,8 +38,8 @@ uint_type amount_of_rows = DEFAULT_AMOUNT_OF_ROWS; // amount of chessmen require
 
 
 enum class Mode {
-	console, graphic, all
-} mode = Mode::all;
+	console, graphic
+} mode = Mode::graphic;
 
 bool software_rendering = false;
 
@@ -675,7 +675,9 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 					is_mouse_moved = true;
 					break;
 				case SDL_MOUSEBUTTONDOWN:
-					is_mouse_pressed = true;
+					if(event.button.button == SDL_BUTTON_LEFT) {
+						is_mouse_pressed = true;
+					}
 					break;
 				case SDL_KEYDOWN: case SDL_KEYUP:
 					keyboard_event(event.key);
@@ -1297,7 +1299,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		unique_ptr<WidgetManager> mainmenu_widgets;
 		unique_ptr<WidgetManager> offline_gaming_widgets;
 
-		unique_ptr<TextField> title_textfield; // Widgets for mainmenu
+		unique_ptr<TextField> title_textfield, cestlavie_textfield; // Widgets for mainmenu
 		unique_ptr<Button> start_button, exit_button;
 
 		unique_ptr<Button> reset_button, back_button; // Widgets for offline gaming
@@ -1387,6 +1389,11 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		title_textfield->set_central_coord({window_size.w / 2, window_size.h * 2 / 10});
 		mainmenu_widgets->register_widget(*title_textfield);
 
+		cestlavie_textfield.reset(new TextField(*font));
+		cestlavie_textfield->set_content("c'est la vie");
+		cestlavie_textfield->set_central_coord({window_size.w / 2, window_size.h * 8 / 10});
+		mainmenu_widgets->register_widget(*cestlavie_textfield);
+
 
 
 		offline_gaming_widgets.reset(new WidgetManager(render));
@@ -1417,7 +1424,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		chessboard_textfield->set_coord({0, background_blank_outof_map_size.h / 3});
 		offline_gaming_widgets->register_widget(*chessboard_textfield);
 
-		chessboard.reset(new Chessboard(render, screen->format, background_blank_outof_map_size));
+		chessboard.reset(new Chessboard(render, screen->format, static_cast<UCoord>(background_blank_outof_map_size)));
 		offline_gaming_widgets->register_widget(*chessboard);
 	}
 
@@ -1426,6 +1433,7 @@ namespace frontend_with_SDL2 { // ---------------- Frontend with SDL2
 		offline_gaming_widgets.reset();
 
 		title_textfield.reset();
+		cestlavie_textfield.reset();
 		start_button.reset();
 		exit_button.reset();
 		reset_button.reset();
@@ -1860,14 +1868,12 @@ int process_argument(size_t argc, char **argv) {
 
 	switch_mode.add_name("-m").add_name("--mode");
 	switch_mode.set_argc(1);
-	switch_mode.set_description("Set the display mode of gobang. Possible option: console, graphic, all.");
+	switch_mode.set_description("Set the display mode of gobang. Possible option: console, graphic.");
 	switch_mode.set_act_func([argv] (char **argvv) {
 		if(strcmp(argvv[0], "console") == 0) {
 			mode = Mode::console;
 		} else if(strcmp(argvv[0], "graphic") == 0) {
 			mode = Mode::graphic;
-		} else if(strcmp(argvv[0], "all") == 0) {
-			mode = Mode::all;
 		} else {
 			log_error("Type \"%s --help\" for usage.", argv[0]);
 			exit(1);
@@ -1909,20 +1915,6 @@ int main(int argc, char **argv) {
 		frontend_with_SDL2::calculate();
 		frontend_with_SDL2::Game g;
 		g.start();
-	} else if(mode == Mode::all) {
-		auto console_func = []() {
-			frontend_with_console::Game g;
-			g.start();
-		};
-		std::thread console_thread(console_func);
-
-		{
-			frontend_with_SDL2::calculate();
-			frontend_with_SDL2::Game g;
-			g.start();
-		}
-
-		console_thread.join();
 	}
 	return 0;
 }
