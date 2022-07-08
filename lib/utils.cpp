@@ -16,15 +16,15 @@ void log(const char *format, ...) {
 
 #ifdef __WIN32
 #include <windows.h>
-void log_error(const char *description, ...) {
+void log_error(const char *fmt, ...) {
 	va_list args;
-	va_start(args, description);
+	va_start(args, fmt);
 	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
 	CONSOLE_SCREEN_BUFFER_INFO info;
 	GetConsoleScreenBufferInfo(handle, &info);
 	WORD general = info.wAttributes;
 	SetConsoleTextAttribute(handle, FOREGROUND_RED);
-	vfprintf(stderr, description, args);
+	vfprintf(stderr, fmt, args);
 	SetConsoleTextAttribute(handle, general);
 	fprintf(stderr, "\n");
 	fflush(stderr);

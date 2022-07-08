@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <thread>
 #include <chrono>
+#include <vector>
 
 std::vector<const char *> filenames;
 int filename_count = 0;
