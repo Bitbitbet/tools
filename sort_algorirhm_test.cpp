@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <iterator>
 #include <vector>
@@ -68,6 +69,20 @@ void insertion_sort(vector<number_t> &v) {
 	}
 }
 
+void bubble_sort(vector<number_t> &v) {
+	if(v.size() < 2) return;
+	for(index_t i = v.size() - 1; i > 0; --i) {
+		bool flag = false;
+		for(index_t j = 0; j < i; ++j) {
+			if(v[j] > v[j + 1]) {
+				swap(v[j], v[j + 1]);
+				flag = true;
+			}
+		}
+		if(!flag) break;
+	}
+}
+
 auto generate_unsorted_sequence() {
 	static std::mt19937 engine(time(nullptr));
 	uniform_int_distribution range(0, 99999);
@@ -80,7 +95,7 @@ auto generate_unsorted_sequence() {
 	return output;
 }
 
-void test(const char *name, auto functor, array<vector<number_t>, TEST_REPEAT_TIME> unsorted) {
+auto test(const char *name, auto functor, array<vector<number_t>, TEST_REPEAT_TIME> unsorted) {
 	static chrono::system_clock clock;
 	cout << name << ": " << flush;
 	auto t1 = clock.now();
@@ -92,12 +107,21 @@ void test(const char *name, auto functor, array<vector<number_t>, TEST_REPEAT_TI
 	auto t2 = clock.now();
 	auto milliseconds = chrono::duration_cast<chrono::milliseconds>(t2 - t1).count();
 	cout << milliseconds << " ms" << endl;
+
+	return unsorted;
 }
+
+#define test_algorithm(name, function_name, unsorted) \
+	if(test((name), (function_name), (unsorted)) == sorted) \
+		cout << (name) << " Passed!\n"; \
+	else \
+		cout << (name) << " Not passed!\n"
 
 int main() {
 	auto unsorted = generate_unsorted_sequence();
 
-	test("Standard Template Library Sort", std_sort, unsorted);
-	test("Insertion Sort", insertion_sort, unsorted);
+	auto sorted = test("Standard Template Library Sort", std_sort, unsorted);
+	test_algorithm("Bubble Sort", bubble_sort, unsorted);
+	test_algorithm("Insertion Sort", insertion_sort, unsorted);
 	return 0;
 }
