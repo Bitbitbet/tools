@@ -51,6 +51,60 @@ void std_sort(vector<number_t> &v) {
 	std::sort(v.begin(), v.end());
 }
 
+void merge_sort(vector<number_t> &v) {
+	if(v.size() < 2) return;
+	using iter_t = vector<number_t>::iterator;
+	struct {
+		void operator()(iter_t begin, iter_t end) {
+			auto length = end - begin;
+			assert(length != 0);
+			if(length == 1) return;
+			/* if(length == 2) {
+				if(*begin > *(begin + 1)) {
+					swap(*begin, *(begin + 1));
+				}
+				return;
+			} */
+
+			auto mid_iter = begin + length / 2;
+			operator()(begin, mid_iter);
+			operator()(mid_iter, end);
+
+			index_t *sorted_indices = new index_t[length];
+			vector<number_t> copy(begin, end);
+			for(index_t a = 0, b = mid_iter - begin;;) {
+				if(copy[a] > copy[b]) {
+					sorted_indices[a + b] = b;
+					++b;
+					if(b == length) {
+						for(auto i = a + b; ++i; i < length) {
+							sorted_indices[i] = ++a;
+						}
+					}
+				} else {
+					sorted_indices[a + b] = a;
+					++a;
+				}
+			}
+		};
+	} process;
+	process(v.begin(), v.end());
+}
+
+void bubble_sort(vector<number_t> &v) {
+	if(v.size() < 2) return;
+	for(index_t i = v.size() - 1; i > 0; --i) {
+		bool flag = false;
+		for(index_t j = 0; j < i; ++j) {
+			if(v[j] > v[j + 1]) {
+				swap(v[j], v[j + 1]);
+				flag = true;
+			}
+		}
+		if(!flag) break;
+	}
+}
+
 void insertion_sort(vector<number_t> &v) {
 	if(v.size() < 2) return;
 	for(index_t i = 1; i < v.size(); ++i) {
@@ -66,20 +120,6 @@ void insertion_sort(vector<number_t> &v) {
 				break;
 			}
 		}
-	}
-}
-
-void bubble_sort(vector<number_t> &v) {
-	if(v.size() < 2) return;
-	for(index_t i = v.size() - 1; i > 0; --i) {
-		bool flag = false;
-		for(index_t j = 0; j < i; ++j) {
-			if(v[j] > v[j + 1]) {
-				swap(v[j], v[j + 1]);
-				flag = true;
-			}
-		}
-		if(!flag) break;
 	}
 }
 
@@ -121,6 +161,7 @@ int main() {
 	auto unsorted = generate_unsorted_sequence();
 
 	auto sorted = test("Standard Template Library Sort", std_sort, unsorted);
+	test_algorithm("Merge Sort", merge_sort, unsorted);
 	test_algorithm("Bubble Sort", bubble_sort, unsorted);
 	test_algorithm("Insertion Sort", insertion_sort, unsorted);
 	return 0;
