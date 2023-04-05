@@ -1,4 +1,3 @@
-#include <bits/get_device_api_level_inlines.h>
 #include <cstdio>
 #include <cstdlib>
 #include <random>
@@ -38,11 +37,11 @@ int main(int argc, char **argv) {
 		result[10] = map[(b << 4) >> 28];
 		result[11] = map[(b << 8) >> 28];
 		result[12] = map[(b << 12) >> 28];
-		result[14] = map[(b << 16) >> 28];
+		result[14] = '4';
 		result[15] = map[(b << 20) >> 28];
 		result[16] = map[(b << 24) >> 28];
 		result[17] = map[(b << 28) >> 28];
-		result[19] = map[c >> 28];
+		result[19] = map[(c >> 30) + 8];
 		result[20] = map[(c << 4) >> 28];
 		result[21] = map[(c << 8) >> 28];
 		result[22] = map[(c << 12) >> 28];
