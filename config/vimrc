@@ -15,6 +15,9 @@ set hlsearch
 set ignorecase
 set smartcase
 set smartindent
+set expandtab
+set tabstop=4
+set shiftwidth=4
 
 map H 7h
 map L 7l
