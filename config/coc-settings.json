@@ -1,5 +1,4 @@
 {
-	"coc.preferences.extensionUpdateCheck": "weekly",
 	"suggest.maxCompleteItemCount": 1000,
 	"codeLens.enable": true,
 	"codeLens.position": "eol",
@@ -8,7 +7,6 @@
 	"diagnostic.enableSign": true,
 	"diagnostic.virtualText": true,
 	"diagnostic.virtualTextCurrentLineOnly": false,
-	"suggest.defaultSortMethod": "alphabetical",
 	"suggest.completionItemKindLabels": {
 		"class": "\uf0e8",
 		"color": "\ue22b",
@@ -36,10 +34,10 @@
 		"value": "\uf89f",
 		"variable": "\ue71b"
 	},
-	"coc.preferences.formatOnSaveFiletypes": [
-		"json",
-		"html"
-	],
+	"coc.preferences.formatOnSave": true,
+	"json.format.enable": false,
+	"suggest.insertMode": "insert",
+	"suggest.noselect": true,
 	"clangd.arguments": [
 		"--clang-tidy"
 	],
@@ -47,5 +45,9 @@
 	"explorer.icon.enableNerdfont": true,
 	"explorer.file.showHiddenFiles": true,
 	"explorer.file.column.indent.indentLine": true,
+	"typescript.format.semicolons": "insert",
+	"typescript.format.insertSpaceAfterCommaDelimiter": true,
+	"typescript.format.insertSpaceAfterSemicolonInForStatements": true,
+	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
 	"languageserver": {}
 }

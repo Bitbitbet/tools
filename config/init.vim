@@ -1,16 +1,16 @@
 " --------------vimspector settings--------------
-map <F3> <Plug>VimspectorStop
-map <F4> <Plug>VimspectorRestart
-map <F5> <Plug>VimspectorContinue
-map <F6> <Plug>VimspectorPause
-map <F7> <Plug>VimspectorBalloonEval
-map <F8> <Plug>VimspectorAddFunctionBreakpoint
-map <F9> <Plug>VimspectorToggleBreakpoint
-map <LEADER><F9> <Plug>VimspectorToggleConditionalBreakpoint
-map <F10> <Plug>VimspectorStepOver
-map <LEADER><F10> <Plug>VimspectorStepInto
-map <F12> <Plug>VimspectorStepout
-map <LEADER>r <Plug>VimspectorRunToCursor
+" map <F3> <Plug>VimspectorStop
+" map <F4> <Plug>VimspectorRestart
+" map <F5> <Plug>VimspectorContinue
+" map <F6> <Plug>VimspectorPause
+" map <F7> <Plug>VimspectorBalloonEval
+" map <F8> <Plug>VimspectorAddFunctionBreakpoint
+" map <F9> <Plug>VimspectorToggleBreakpoint
+" map <LEADER><F9> <Plug>VimspectorToggleConditionalBreakpoint
+" map <F10> <Plug>VimspectorStepOver
+" map <LEADER><F10> <Plug>VimspectorStepInto
+" map <F12> <Plug>VimspectorStepout
+" map <LEADER>r <Plug>VimspectorRunToCursor
 " F3: stop
 " F4: restart
 " F5: start or continue
@@ -21,7 +21,7 @@ map <LEADER>r <Plug>VimspectorRunToCursor
 " <LEADER>F10: Step into
 " F12: Step out of
 
-map <silent> <LEADER><F3> :VimspectorReset<CR>
+" map <silent> <LEADER><F3> :VimspectorReset<CR>
 
 
 " --------------loading plugins--------------
@@ -33,7 +33,7 @@ Plug 'vim-airline/vim-airline-themes'
 Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && yarn install'  }
 Plug 'ajmwagar/vim-deus'
-Plug 'puremourning/vimspector'
+" Plug 'puremourning/vimspector'
 " Plug 'Yggdroot/indentLine'
 Plug 'mg979/vim-visual-multi', {'branch': 'master'}
 
@@ -57,7 +57,9 @@ let g:airline#extensions#coc#enabled = 1
 
 
 " --------------coc.nvim settings--------------
-let g:coc_global_extensions = ['coc-json', 'coc-vimlsp', 'coc-clangd', 'coc-jedi', 'coc-explorer', 'coc-html']
+let g:coc_global_extensions = ['coc-json', 'coc-vimlsp', 'coc-clangd', 'coc-jedi', 'coc-explorer', 'coc-html', 'coc-tsserver']
+
+set signcolumn=yes
 
 " completion configuration
 noremap <silent><expr> <C-space> coc#refresh()
@@ -77,8 +79,8 @@ function! CheckBackspace() abort
 	return !col || getline('.')[col - 1]  =~# '\s'
 endfunction
 
-nmap <silent> g[ <Plug>(coc-diagnostic-prev)
-nmap <silent> g] <Plug>(coc-diagnostic-next)
+nmap <silent> [g <Plug>(coc-diagnostic-prev)
+nmap <silent> ]g <Plug>(coc-diagnostic-next)
 nmap <silent> gd <Plug>(coc-definition)
 nmap <silent> gy <Plug>(coc-type-definition)
 nmap <silent> gi <Plug>(coc-implementation)
@@ -261,9 +263,13 @@ set number
 set relativenumber
 set ignorecase
 set smartcase
+
 set expandtab
 set tabstop=4
 set shiftwidth=4
+
+autocmd FileType html set noexpandtab tabstop=4 shiftwidth=4
+autocmd FileType json set noexpandtab tabstop=4 shiftwidth=4
 
 map H 7h
 map L 7l
@@ -284,12 +290,6 @@ noremap <silent> <LEADER>h <C-w>h
 noremap <silent> <LEADER>j <C-w>j
 noremap <silent> <LEADER>k <C-w>k
 noremap <silent> <LEADER>l <C-w>l
-
-" filetype indent off
-" set nocindent
-" set nosmartindent
-" set noautoindent
-
 
 exec "nohlsearch"
 au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
