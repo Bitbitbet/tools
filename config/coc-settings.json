@@ -37,7 +37,6 @@
 	"coc.preferences.formatOnSave": true,
 	"json.format.enable": false,
 	"suggest.insertMode": "insert",
-	"suggest.noselect": true,
 	"clangd.arguments": [
 		"--clang-tidy"
 	],
@@ -49,5 +48,9 @@
 	"typescript.format.insertSpaceAfterCommaDelimiter": true,
 	"typescript.format.insertSpaceAfterSemicolonInForStatements": true,
 	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
+	"coc.source.file.enable": false,
+	"coc.source.buffer.enable": false,
+	"coc.source.around.enable": false,
+	"suggest.acceptSuggestionOnCommitCharacter": true,
 	"languageserver": {}
 }
