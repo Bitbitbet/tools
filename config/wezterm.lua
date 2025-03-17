@@ -18,7 +18,7 @@ config.initial_rows = 40
 
 config.font = wezterm.font_with_fallback({
     "Hack",
-    "Noto Sans CJK SC"
+    "Noto Sans CJK SC",
 })
 
 return config
