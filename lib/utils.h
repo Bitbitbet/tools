@@ -46,6 +46,7 @@ bool kbhit();
 #endif
 
 #include <type_traits>
+#include <cstdint>
 
 using uint_type = size_t;
 using int_type = std::make_signed_t<uint_type>;
