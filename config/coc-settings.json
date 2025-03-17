@@ -34,7 +34,7 @@
 		"value": "\uf89f",
 		"variable": "\ue71b"
 	},
-	"coc.preferences.formatOnSave": true,
+	"coc.preferences.formatOnSave": false,
 	"json.format.enable": false,
 	"suggest.insertMode": "insert",
 	"clangd.arguments": [
@@ -48,7 +48,6 @@
 	"typescript.format.insertSpaceAfterCommaDelimiter": true,
 	"typescript.format.insertSpaceAfterSemicolonInForStatements": true,
 	"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
-	"coc.source.file.enable": false,
 	"coc.source.buffer.enable": false,
 	"coc.source.around.enable": false,
 	"suggest.acceptSuggestionOnCommitCharacter": true,
