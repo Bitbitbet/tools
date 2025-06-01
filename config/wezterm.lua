@@ -21,4 +21,15 @@ config.font = wezterm.font_with_fallback({
     "Noto Sans CJK SC",
 })
 
+config.keys = {
+    {
+        key = 'Backspace',
+        mods = 'CTRL',
+        action = wezterm.action.SendKey {
+            key = 'w',
+            mods = "CTRL"
+        }
+    }
+}
+
 return config
